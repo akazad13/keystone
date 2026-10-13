@@ -11,15 +11,15 @@ export const userSchema = z.object({
 
 export type User = z.infer<typeof userSchema>;
 
+/** A project as returned by the Core API (ProjectDto). The owner is implicit: always the caller. */
 export const projectSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
-  description: z.string().optional(),
-  status: z.enum(["active", "archived", "draft"]),
-  ownerId: z.string(),
-  memberCount: z.number().int().nonnegative(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  description: z.string().nullable(),
+  status: z.enum(["Active", "Archived", "Completed"]),
+  dueDate: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string().nullable(),
 });
 
 export type Project = z.infer<typeof projectSchema>;
@@ -62,9 +62,11 @@ export const metricsSchema = z.object({
 
 export type Metrics = z.infer<typeof metricsSchema>;
 
+// Mirrors the Core API's CreateProjectValidator, so most mistakes are caught before a round trip.
 export const createProjectSchema = z.object({
-  name: z.string().min(1, "Project name is required").max(100),
-  description: z.string().max(500).optional(),
+  name: z.string().trim().min(1, "Project name is required").max(200),
+  description: z.string().max(2000).optional(),
+  dueDate: z.string().optional(),
 });
 
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;

@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Fingerprint, Loader2, Server, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { SignInPrompt } from "@/components/auth/SignInPrompt";
 import { useAuth } from "@/hooks/useAuth";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -29,7 +29,7 @@ function formatValue(claim: Claim): string {
 }
 
 function WhoAmIPage() {
-  const { user, isAuthenticated, isLoading, loginUrl } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
 
   // Goes BFF -> (token exchange) -> Core API. The BFF's own /me never reaches the Core API.
   const whoami = useQuery<WhoAmIResponse, ApiError>({
@@ -44,14 +44,7 @@ function WhoAmIPage() {
   }
 
   if (!isAuthenticated || !user) {
-    return (
-      <div className="mx-auto mt-12 max-w-md text-center">
-        <p className="mb-4 text-slate-600">Sign in to see who the platform thinks you are.</p>
-        <a href={loginUrl}>
-          <Button>Sign in</Button>
-        </a>
-      </div>
-    );
+    return <SignInPrompt message="Sign in to see who the platform thinks you are." />;
   }
 
   const sessionTypes = new Set(user.claims.map((c) => c.type));

@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { to: "/", label: "Home", icon: Home },
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/dashboard", label: "Projects", icon: FolderOpen },
+  { to: "/projects", label: "Projects", icon: FolderOpen },
   { to: "/dashboard", label: "Deployments", icon: Rocket },
   { to: "/dashboard", label: "Team", icon: Users },
   { to: "/dashboard", label: "Settings", icon: Settings },

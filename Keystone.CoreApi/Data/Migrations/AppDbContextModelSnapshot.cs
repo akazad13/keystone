@@ -56,8 +56,7 @@ namespace Keystone.CoreApi.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Email")
-                        .IsUnique();
+                    b.HasIndex("Email");
 
                     b.HasIndex("ExternalId")
                         .IsUnique();
@@ -77,6 +76,9 @@ namespace Keystone.CoreApi.Data.Migrations
                     b.Property<string>("Description")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateOnly?>("DueDate")
+                        .HasColumnType("date");
 
                     b.Property<string>("Name")
                         .IsRequired()

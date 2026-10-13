@@ -4,6 +4,11 @@ using Keystone.CoreApi.Validators;
 
 namespace Keystone.CoreApi.Endpoints;
 
+/// <summary>
+/// The caller's own projects. The owner is always the authenticated user (resolved by
+/// <see cref="ICurrentUserService"/>); another user's project id behaves exactly like an
+/// unknown id (404), so ids cannot be probed.
+/// </summary>
 public static class ProjectEndpoints
 {
     public static IEndpointRouteBuilder MapProjectEndpoints(this IEndpointRouteBuilder routes)
@@ -12,26 +17,28 @@ public static class ProjectEndpoints
             .WithTags("Projects")
             .RequireAuthorization("User");
 
-        group.MapGet("/", async (IProjectService service, CancellationToken ct) =>
+        group.MapGet("/", async (ICurrentUserService currentUser, IProjectService service, CancellationToken ct) =>
         {
-            var projects = await service.GetAllAsync(ct);
-            return Results.Ok(projects);
+            var user = await currentUser.GetOrCreateAsync(ct);
+            return Results.Ok(await service.GetForOwnerAsync(user.Id, ct));
         })
-        .WithName("GetAllProjects")
-        .Produces(200);
+        .WithName("GetMyProjects")
+        .Produces<IReadOnlyList<ProjectDto>>();
 
-        group.MapGet("/{id:guid}", async (Guid id, IProjectService service, CancellationToken ct) =>
+        group.MapGet("/{id:guid}", async (Guid id, ICurrentUserService currentUser, IProjectService service, CancellationToken ct) =>
         {
-            var project = await service.GetByIdAsync(id, ct);
+            var user = await currentUser.GetOrCreateAsync(ct);
+            var project = await service.GetByIdAsync(id, user.Id, ct);
             return project is not null ? Results.Ok(project) : Results.NotFound();
         })
         .WithName("GetProjectById")
-        .Produces(200)
+        .Produces<ProjectDto>()
         .Produces(404);
 
         group.MapPost("/", async (
             CreateProjectRequest request,
             IValidator<CreateProjectRequest> validator,
+            ICurrentUserService currentUser,
             IProjectService service,
             CancellationToken ct) =>
         {
@@ -41,17 +48,19 @@ public static class ProjectEndpoints
                 return Results.ValidationProblem(validationResult.ToDictionary());
             }
 
-            var project = await service.CreateAsync(request.Name, request.Description, request.OwnerId, ct);
+            var user = await currentUser.GetOrCreateAsync(ct);
+            var project = await service.CreateAsync(user.Id, request.Name, request.Description, request.DueDate, ct);
             return Results.Created($"/api/projects/{project.Id}", project);
         })
         .WithName("CreateProject")
-        .Produces(201)
+        .Produces<ProjectDto>(201)
         .Produces(400);
 
         group.MapPut("/{id:guid}", async (
             Guid id,
             UpdateProjectRequest request,
             IValidator<UpdateProjectRequest> validator,
+            ICurrentUserService currentUser,
             IProjectService service,
             CancellationToken ct) =>
         {
@@ -61,21 +70,22 @@ public static class ProjectEndpoints
                 return Results.ValidationProblem(validationResult.ToDictionary());
             }
 
-            var project = await service.UpdateAsync(id, request.Name, request.Description, request.Status, ct);
+            var user = await currentUser.GetOrCreateAsync(ct);
+            var project = await service.UpdateAsync(id, user.Id, request.Name, request.Description, request.Status, request.DueDate, ct);
             return project is not null ? Results.Ok(project) : Results.NotFound();
         })
         .WithName("UpdateProject")
-        .Produces(200)
+        .Produces<ProjectDto>()
         .Produces(400)
         .Produces(404);
 
-        group.MapDelete("/{id:guid}", async (Guid id, IProjectService service, CancellationToken ct) =>
+        group.MapDelete("/{id:guid}", async (Guid id, ICurrentUserService currentUser, IProjectService service, CancellationToken ct) =>
         {
-            var deleted = await service.DeleteAsync(id, ct);
+            var user = await currentUser.GetOrCreateAsync(ct);
+            var deleted = await service.DeleteAsync(id, user.Id, ct);
             return deleted ? Results.NoContent() : Results.NotFound();
         })
         .WithName("DeleteProject")
-        .RequireAuthorization("Admin")
         .Produces(204)
         .Produces(404);
 

@@ -147,11 +147,11 @@ Both are described step by step in [docs/oidc-guide.md](docs/oidc-guide.md#6-log
 | `keystone:bff:session:sub:{sub}` | BFF | Set of session ids of one user | Session lifetime |
 | `keystone:bff:logout-jti:{jti}` | BFF `LogoutTokenValidator` | Marker that a logout token was already processed (replay protection) | Token expiry + 5 minutes |
 | `keystone:bff:dataprotection-keys` | ASP.NET Core Data Protection | Keys that encrypt cookies and session payloads, shared by all BFF replicas | Managed by Data Protection |
-| `keystone:core-api:*` | Core API `ProjectService` | Cached project lists | 5 minutes |
+| `keystone:core-api:projects:owner:{userId}` | Core API `ProjectService` | One user's project list (one key per user, so lists are never shared) | 5 minutes |
 
 ### 4.3 SQL
 
-The Core API owns the `keystonedb` database (tables `Users`, `Projects`). The schema is managed with EF Core migrations in `Keystone.CoreApi/Data/Migrations`, applied at startup. EF Core takes a database lock while migrating, so several replicas starting together do not race.
+The Core API owns the `keystonedb` database (tables `Users`, `Projects`). A `Users` row is created the first time someone calls the API (just-in-time provisioning in `CurrentUserService`), keyed by the identity provider's `sub` (`ExternalId`), and refreshed from later tokens. Every project belongs to the user who created it; the owner is taken from the token, never from the request. The schema is managed with EF Core migrations in `Keystone.CoreApi/Data/Migrations`, applied at startup. EF Core takes a database lock while migrating, so several replicas starting together do not race.
 
 ---
 

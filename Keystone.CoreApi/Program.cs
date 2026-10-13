@@ -51,6 +51,8 @@ builder.Services.AddAuthorizationBuilder()
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 // Application services
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 
 // OpenAPI

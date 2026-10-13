@@ -10,6 +10,8 @@ public class Project
 
     public string Status { get; set; } = "Active";
 
+    public DateOnly? DueDate { get; set; }
+
     public Guid OwnerId { get; set; }
 
     public AppUser Owner { get; set; } = null!;

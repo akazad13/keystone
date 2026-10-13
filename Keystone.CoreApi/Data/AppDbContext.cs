@@ -22,8 +22,10 @@ public class AppDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.ExternalId).HasMaxLength(256).IsRequired();
             entity.HasIndex(e => e.ExternalId).IsUnique();
+            // Users are identified by ExternalId (the identity provider's "sub"), not by email:
+            // an email can change, be reused, or be missing entirely.
             entity.Property(e => e.Email).HasMaxLength(256).IsRequired();
-            entity.HasIndex(e => e.Email).IsUnique();
+            entity.HasIndex(e => e.Email);
             entity.Property(e => e.DisplayName).HasMaxLength(256).IsRequired();
             entity.Property(e => e.Role).HasMaxLength(50).IsRequired();
         });
