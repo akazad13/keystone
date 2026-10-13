@@ -20,6 +20,9 @@ public sealed class CurrentUserService : ICurrentUserService
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ILogger<CurrentUserService> _logger;
 
+    // Recording every single request would turn each API call into a database write.
+    private static readonly TimeSpan LastSeenResolution = TimeSpan.FromMinutes(5);
+
     private AppUser? _current;
 
     public CurrentUserService(AppDbContext db, IHttpContextAccessor httpContextAccessor, ILogger<CurrentUserService> logger)
@@ -55,7 +58,8 @@ public sealed class CurrentUserService : ICurrentUserService
                 ExternalId = sub,
                 Email = email,
                 DisplayName = displayName,
-                Role = role
+                Role = role,
+                LastSeenAt = DateTime.UtcNow
             };
             _db.Users.Add(user);
 
@@ -71,13 +75,23 @@ public sealed class CurrentUserService : ICurrentUserService
                 user = await _db.Users.SingleAsync(u => u.ExternalId == sub, ct);
             }
         }
-        else if (user.Email != email || user.DisplayName != displayName || user.Role != role)
+        else
         {
-            user.Email = email;
-            user.DisplayName = displayName;
-            user.Role = role;
-            user.UpdatedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync(ct);
+            var now = DateTime.UtcNow;
+            if (user.Email != email || user.DisplayName != displayName || user.Role != role)
+            {
+                user.Email = email;
+                user.DisplayName = displayName;
+                user.Role = role;
+                user.UpdatedAt = now;
+            }
+
+            if (now - user.LastSeenAt > LastSeenResolution)
+            {
+                user.LastSeenAt = now;
+            }
+
+            await _db.SaveChangesAsync(ct); // no-op when nothing changed
         }
 
         return _current = user;

@@ -74,11 +74,26 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseAuthentication();
+
+// Every authenticated call provisions the caller's Users row (first call) and refreshes it,
+// so the row exists and LastSeenAt is current whichever endpoint the user hits. It runs before
+// UseAuthorization so that calls ending in 403 still count as the user being seen.
+app.Use(async (context, next) =>
+{
+    if (context.User.Identity?.IsAuthenticated == true)
+    {
+        await context.RequestServices.GetRequiredService<ICurrentUserService>().GetOrCreateAsync(context.RequestAborted);
+    }
+
+    await next();
+});
+
 app.UseAuthorization();
 
 // Map endpoints
 app.MapProjectEndpoints();
 app.MapWhoAmIEndpoints();
+app.MapAdminEndpoints();
 app.MapDefaultEndpoints();
 
 app.Run();

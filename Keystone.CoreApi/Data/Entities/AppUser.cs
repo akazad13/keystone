@@ -16,5 +16,8 @@ public class AppUser
 
     public DateTime? UpdatedAt { get; set; }
 
+    /// <summary>Last API call by this user, updated at most every few minutes.</summary>
+    public DateTime LastSeenAt { get; set; } = DateTime.UtcNow;
+
     public ICollection<Project> Projects { get; set; } = [];
 }

@@ -58,7 +58,7 @@ Before you start: get the app running ([local-development.md](local-development.
 
 **Hints**
 
-* Core API: `GET /api/users` with the `Admin` policy, returning the `AppUser` rows (feature 2 creates them).
+* Core API: `GET /api/admin/users` with the `Admin` policy, returning the `AppUser` rows (feature 2 creates them). A `/api/admin` group makes "admin only" visible in the URL.
 * Admin SPA: adapt `src/routes/users.tsx` and `src/lib/schemas.ts` to the real shape. Handle `403` with a friendly "admins only" message instead of an error.
 * Sign in as bob: 403. In the Zitadel console, give bob the `Admin` role. Within 15 minutes his next exchanged token carries it, or sign out and in again to get it at once. Why the delay? (Hint: the cached Keystone token.)
 

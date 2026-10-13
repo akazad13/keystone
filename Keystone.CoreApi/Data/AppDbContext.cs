@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Keystone.CoreApi.Data.Entities;
 
 namespace Keystone.CoreApi.Data;
@@ -12,6 +13,18 @@ public class AppDbContext : DbContext
     public DbSet<AppUser> Users => Set<AppUser>();
 
     public DbSet<Project> Projects => Set<Project>();
+
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        // All timestamps are stored in UTC. SQL Server's datetime2 does not keep that fact, so mark
+        // values read back as UTC; otherwise JSON omits the "Z" and browsers read them as local time.
+        configurationBuilder.Properties<DateTime>().HaveConversion<UtcDateTimeConverter>();
+        configurationBuilder.Properties<DateTime?>().HaveConversion<UtcDateTimeConverter>();
+    }
+
+    private sealed class UtcDateTimeConverter() : ValueConverter<DateTime, DateTime>(
+        value => value,
+        value => DateTime.SpecifyKind(value, DateTimeKind.Utc));
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
