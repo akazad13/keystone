@@ -1,0 +1,23 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.6.1">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <UserSecretsId>keystone-apphost-6b1f2c4e</UserSecretsId>
+    <!-- Orchestration (DCP, dashboard) comes from NuGet, so `dotnet run` works without the Aspire CLI installed. -->
+    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Azure.AppContainers" />
+    <PackageReference Include="Aspire.Hosting.Azure.Redis" />
+    <PackageReference Include="Aspire.Hosting.Azure.Sql" />
+    <PackageReference Include="Aspire.Hosting.JavaScript" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Keystone.IdentityService\Keystone.IdentityService.csproj" />
+    <ProjectReference Include="..\Keystone.CoreApi\Keystone.CoreApi.csproj" />
+    <ProjectReference Include="..\Keystone.Bff\Keystone.Bff.csproj" />
+  </ItemGroup>
+
+</Project>

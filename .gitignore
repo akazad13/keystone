@@ -1,0 +1,22 @@
+# Build output
+bin/
+obj/
+dist/
+*.tsbuildinfo
+
+# Dependencies
+node_modules/
+
+# IDE and machine-specific files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Local Claude Code settings
+.claude/settings.local.json
+
+# Secrets and local state (user secrets live outside the repo; this is the copied Zitadel setup token)
+zitadel/.setup.pat
+*.pfx
