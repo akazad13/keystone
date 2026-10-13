@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -14,6 +13,10 @@ namespace Keystone.Bff.Services;
 /// The Zitadel tokens never leave the BFF, and the Core API never sees a Zitadel token: it only
 /// trusts tokens signed by the Identity Service.
 /// </para>
+/// <para>
+/// A cached Keystone token never outlives the Zitadel access token it was exchanged from, so an
+/// expired upstream session cannot hide behind the cache.
+/// </para>
 /// </summary>
 public sealed class SessionTokenService : ISessionTokenService
 {
@@ -24,17 +27,20 @@ public sealed class SessionTokenService : ISessionTokenService
     private static readonly TimeSpan RenewBeforeExpiry = TimeSpan.FromMinutes(1);
 
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly TokenRefresher _refresher;
     private readonly IConnectionMultiplexer _redis;
     private readonly IDataProtector _protector;
     private readonly ILogger<SessionTokenService> _logger;
 
     public SessionTokenService(
         IHttpClientFactory httpClientFactory,
+        TokenRefresher refresher,
         IConnectionMultiplexer redis,
         IDataProtectionProvider dataProtection,
         ILogger<SessionTokenService> logger)
     {
         _httpClientFactory = httpClientFactory;
+        _refresher = refresher;
         _redis = redis;
         _protector = dataProtection.CreateProtector("Keystone.Bff.CoreApiTokens");
         _logger = logger;
@@ -57,22 +63,23 @@ public sealed class SessionTokenService : ISessionTokenService
             return _protector.Unprotect(System.Text.Encoding.UTF8.GetString(cached));
         }
 
-        // The identity provider's access token, saved in the session at login (SaveTokens = true).
-        var subjectToken = auth.Properties.GetTokenValue("access_token");
-        if (subjectToken is null || IsExpired(auth.Properties.GetTokenValue("expires_at")))
+        // The identity provider's access token (saved in the session at login), refreshed if needed.
+        var subjectToken = await _refresher.GetAccessTokenAsync(sessionId, auth.Properties, cancellationToken);
+        if (subjectToken is null)
         {
-            // Refreshing the identity provider's token with the refresh_token is a build-along exercise.
             _logger.LogInformation("Session {SessionId} has no usable identity-provider access token", sessionId);
             return null;
         }
 
-        var exchanged = await ExchangeAsync(subjectToken, cancellationToken);
+        var exchanged = await ExchangeAsync(subjectToken.AccessToken, cancellationToken);
         if (exchanged is null)
         {
             return null;
         }
 
-        var cacheFor = TimeSpan.FromSeconds(exchanged.ExpiresIn) - RenewBeforeExpiry;
+        var keystoneTokenLifetime = TimeSpan.FromSeconds(exchanged.ExpiresIn);
+        var upstreamLifetime = subjectToken.ExpiresAt - DateTimeOffset.UtcNow;
+        var cacheFor = (keystoneTokenLifetime < upstreamLifetime ? keystoneTokenLifetime : upstreamLifetime) - RenewBeforeExpiry;
         if (cacheFor > TimeSpan.Zero)
         {
             await db.StringSetAsync(cacheKey, System.Text.Encoding.UTF8.GetBytes(_protector.Protect(exchanged.AccessToken)), cacheFor);
@@ -102,11 +109,6 @@ public sealed class SessionTokenService : ISessionTokenService
 
         return await response.Content.ReadFromJsonAsync<TokenExchangeResponse>(cancellationToken);
     }
-
-    private static bool IsExpired(string? expiresAt) =>
-        expiresAt is not null
-        && DateTimeOffset.TryParse(expiresAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var expires)
-        && expires <= DateTimeOffset.UtcNow.Add(RenewBeforeExpiry);
 
     private sealed record TokenExchangeResponse(
         [property: JsonPropertyName("access_token")] string AccessToken,

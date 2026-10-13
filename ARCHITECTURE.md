@@ -142,7 +142,8 @@ Both are described step by step in [docs/oidc-guide.md](docs/oidc-guide.md#6-log
 | Key | Written by | Contents | Lifetime |
 |-----|------------|----------|----------|
 | `keystone:bff:session:{id}` | BFF `RedisTicketStore` | The authentication ticket (claims + Zitadel tokens), encrypted with Data Protection | Session lifetime (8 h sliding) |
-| `keystone:bff:session:{id}:core-api-token` | BFF `SessionTokenService` | The cached Keystone token, encrypted | Token lifetime minus 1 minute |
+| `keystone:bff:session:{id}:core-api-token` | BFF `SessionTokenService` | The cached Keystone token, encrypted | The shorter of its own and the Zitadel access token's lifetime, minus 1 minute |
+| `keystone:bff:session:{id}:refresh-lock` | BFF `TokenRefresher` | Lock so only one request refreshes a session's tokens at a time | 10 seconds (released after the refresh) |
 | `keystone:bff:session:sid:{sid}` | BFF | Set of session ids created from one Zitadel session | Session lifetime |
 | `keystone:bff:session:sub:{sub}` | BFF | Set of session ids of one user | Session lifetime |
 | `keystone:bff:logout-jti:{jti}` | BFF `LogoutTokenValidator` | Marker that a logout token was already processed (replay protection) | Token expiry + 5 minutes |
@@ -249,7 +250,6 @@ Aspire 9 is out of support. Aspire 13 generates the Bicep, builds the images and
 Known gaps, good next steps (several are build-along exercises):
 
 * The Identity Service's `/connect/token` relies on network isolation; it does not authenticate its caller.
-* Zitadel tokens are not refreshed yet: when Zitadel's access token expires, API calls get 401 and the user signs in again.
 * The signing key is not rotated; the JWKS only ever contains one key.
 * Health endpoints are only mapped in Development; Container Apps health probes are not configured.
 

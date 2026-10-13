@@ -154,7 +154,8 @@ The cookie `__Host-keystone`:
 The Core API never receives a Zitadel token. When a request for `/api/keystone/**` arrives, the YARP transform in `Keystone.Bff/Program.cs` calls `SessionTokenService.GetAccessTokenAsync`:
 
 1. If a Keystone token is cached for this session, use it.
-2. Otherwise post an **RFC 8693 token exchange** to the Identity Service:
+2. Make sure the session's Zitadel access token is still valid; if it expires within a minute, refresh it first (section 5.1).
+3. Post an **RFC 8693 token exchange** to the Identity Service:
 
    ```http
    POST /connect/token
@@ -166,8 +167,8 @@ The Core API never receives a Zitadel token. When a request for `/api/keystone/*
    &audience=core-api
    ```
 
-3. The Identity Service (`AuthEndpoints.HandleTokenExchange`) calls Zitadel's **userinfo** endpoint with the subject token. If Zitadel answers 401, the token is invalid, expired or revoked, and the exchange fails with `invalid_grant`. This works whatever the format of Zitadel's access token (JWT or opaque).
-4. `UserService` maps Zitadel's claims to a Keystone user, including Zitadel's role format (`urn:zitadel:iam:org:project:roles`), and `TokenService` signs a JWT:
+4. The Identity Service (`AuthEndpoints.HandleTokenExchange`) calls Zitadel's **userinfo** endpoint with the subject token. If Zitadel answers 401, the token is invalid, expired or revoked, and the exchange fails with `invalid_grant`. This works whatever the format of Zitadel's access token (JWT or opaque).
+5. `UserService` maps Zitadel's claims to a Keystone user, including Zitadel's role format (`urn:zitadel:iam:org:project:roles`), and `TokenService` signs a JWT:
 
    ```json
    { "typ": "at+jwt", "alg": "RS256", "kid": "<thumbprint>" }
@@ -182,9 +183,30 @@ The Core API never receives a Zitadel token. When a request for `/api/keystone/*
    }
    ```
 
-5. The Core API (`Keystone.CoreApi/Program.cs`) validates it **offline**: signature with the cached JWKS from the Identity Service, `iss`, `aud = core-api`, `exp`, and `typ = at+jwt`. `RequireRole("Admin")` then reads the `role` claim.
+6. The Core API (`Keystone.CoreApi/Program.cs`) validates it **offline**: signature with the cached JWKS from the Identity Service, `iss`, `aud = core-api`, `exp`, and `typ = at+jwt`. `RequireRole("Admin")` then reads the `role` claim.
 
 **See it:** in the Aspire dashboard's **Traces**, open a `GET /api/keystone/{**catch-all}` trace. The first call in a session shows the `identity-service` hop and its call to Zitadel. Later calls go straight from the BFF to `core-api`. To read a Keystone token, post it to the Identity Service's introspection endpoint (`/internal/introspect`, form field `token`).
+
+### 5.1 Refreshing Zitadel's access token
+
+Zitadel's access token expires (12 hours by default) long before the 8-hour sliding session would. `TokenRefresher` (`Keystone.Bff/Services/TokenRefresher.cs`) keeps it usable:
+
+```http
+POST /oauth/v2/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=refresh_token&refresh_token=<from the session>&client_id=...&client_secret=...
+```
+
+Things to notice in the code:
+
+* **Rotation.** Zitadel returns a *new* refresh token each time and the old one stops working, so the new one is saved into the session immediately.
+* **In-place update.** The session is rewritten with `RedisTicketStore.RenewAsync` under the same id. `HttpContext.SignInAsync` would mint a new session id, and every other request still carrying the old cookie would fail.
+* **One refresh at a time.** With rotation, two simultaneous refreshes would make the second one present an already-used refresh token. A Redis lock (`...:refresh-lock`) serializes them; the waiting request re-reads the session and finds the fresh token.
+* **Rejected means over.** If Zitadel answers `invalid_grant` (refresh token expired, revoked, or its SSO session ended), the session is deleted and the user gets a clean 401.
+* **The cache follows the upstream token.** A cached Keystone token never lives longer than the Zitadel access token it was exchanged from.
+
+**See it:** shorten the access token lifetime in the Zitadel console (Default settings > OIDC token lifetimes and expiration, e.g. 2 minutes), sign in, wait a little over a minute, and call the API. The Aspire trace shows the BFF calling Zitadel's token endpoint before the token exchange. Fire several calls at once (`Promise.all` in the browser console): Zitadel's log still shows only one refresh.
 
 ---
 
@@ -326,4 +348,4 @@ Then `BackChannelLogoutEndpoints` deletes the sessions: by `sid` when present (j
 | API calls return 401 right after login | Token exchange failed. Check the Identity Service logs in the dashboard (wrong `oidc-authority`, Zitadel unreachable). |
 | API calls return 403 | The user lacks the role. Check the user's authorizations in the Zitadel console (Users > the user > Authorizations). |
 | Back-channel logout never arrives | The app's back-channel URI must use `host.docker.internal:5003` (Zitadel runs in Docker); the deny list in `zitadel/.env` must allow it; the AppHost must be running. |
-| `invalid_grant` from `/connect/token` | The Zitadel access token expired. Sign in again (or build token refresh: see the build-along). |
+| `invalid_grant` from `/connect/token` | The Zitadel access token was rejected by userinfo. Normally `TokenRefresher` renews it first; check the BFF logs for a failed refresh. |

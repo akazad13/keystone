@@ -107,6 +107,7 @@ builder.Services.AddAuthorization();
 // --- Token exchange (identity-provider token -> Keystone token for the Core API) ---
 builder.Services.AddHttpClient(SessionTokenService.HttpClientName,
     client => client.BaseAddress = new Uri("http://identity-service"));
+builder.Services.AddSingleton<TokenRefresher>();
 builder.Services.AddSingleton<ISessionTokenService, SessionTokenService>();
 builder.Services.AddSingleton<LogoutTokenValidator>();
 
