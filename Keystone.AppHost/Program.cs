@@ -70,9 +70,23 @@ var bff = builder.AddProject<Projects.Keystone_Bff>("bff", launchProfileName: "h
 var keystone = builder.AddViteApp("keystone", "../keystone");
 var keystoneAdmin = builder.AddViteApp("keystone-admin", "../keystone-admin");
 
-if (builder.ExecutionContext.IsRunMode)
+// Production preview (scripts/preview-production.ps1): the BFF runs in Production mode and serves the
+// already-built SPAs from a local folder laid out like its container's wwwroot. This exercises the
+// Azure code paths (static files, client-side route fallbacks, no Vite proxy) on your machine.
+var previewWebRoot = builder.Configuration["Keystone:PreviewWebRoot"];
+
+if (builder.ExecutionContext.IsRunMode && previewWebRoot is null)
 {
     bff.WithReference(keystone).WithReference(keystoneAdmin);
+}
+else if (builder.ExecutionContext.IsRunMode)
+{
+    bff.WithEnvironment("ASPNETCORE_ENVIRONMENT", "Production")
+        .WithEnvironment("ASPNETCORE_WEBROOT", Path.GetFullPath(previewWebRoot!));
+
+    // The dev servers are not needed; they can still be started from the dashboard.
+    keystone.WithExplicitStart();
+    keystoneAdmin.WithExplicitStart();
 }
 
 bff.PublishWithContainerFiles(keystone, "./wwwroot");

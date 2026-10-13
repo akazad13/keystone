@@ -217,8 +217,9 @@ app.MapDefaultEndpoints();
 
 if (!app.Environment.IsDevelopment())
 {
-    // Client-side routes: unknown paths load the matching SPA's index.html.
-    app.MapFallbackToFile("/admin/{**path}", "admin/index.html");
+    // Client-side routes: unknown paths load the matching SPA's index.html. ":nonfile" keeps real
+    // files (e.g. /admin/assets/index-abc.js) out of the fallback so static files can serve them.
+    app.MapFallbackToFile("/admin/{*path:nonfile}", "admin/index.html");
     app.MapFallbackToFile("index.html");
 }
 

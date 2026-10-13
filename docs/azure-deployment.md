@@ -26,6 +26,16 @@ The identity provider is **not** deployed. In Azure, Keystone uses a hosted Zita
 * Docker running (the images are built on your machine).
 * A Zitadel Cloud account (free tier): <https://zitadel.com>.
 
+## Step 0: Preview the production build locally
+
+In Azure the BFF runs in Production mode and serves the built SPAs itself; locally it normally proxies the Vite dev servers. Check the production code paths on your machine first:
+
+```powershell
+pwsh ./scripts/preview-production.ps1
+```
+
+The script runs `npm run build` for both SPAs, lays the output out like the BFF image (`artifacts/wwwroot/` and `artifacts/wwwroot/admin/`), and starts the AppHost with the BFF in Production mode serving that folder. Open <https://localhost:7003> as usual and check deep links such as `/projects` and `/admin/users`. (This is how a broken admin fallback route, which served `index.html` instead of the admin JavaScript, was caught before it ever reached Azure.)
+
 ## Step 1: Prepare Zitadel Cloud
 
 In your Zitadel Cloud instance's console, repeat what `zitadel/setup.ps1` does locally:

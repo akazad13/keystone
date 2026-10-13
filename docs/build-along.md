@@ -128,7 +128,7 @@ Before you start: get the app running ([local-development.md](local-development.
 
 **Hints**
 
-* Before deploying, run `aspire publish` and read the generated Bicep for `bff` and `core-api`. Find the managed identity, the role assignments for SQL and Redis, and the Container App secrets.
+* Before deploying, run `pwsh ./scripts/preview-production.ps1`: the BFF serves the built SPAs exactly as it will in Azure. Then run `aspire publish` and read the generated Bicep for `bff` and `core-api`. Find the managed identity, the role assignments for SQL and Redis, and the Container App secrets.
 * After deploying, scale the BFF to 2 replicas in the portal and keep using the app. Why does your session survive whichever replica answers? (Hint: two things in Redis.)
 * Trigger a back-channel logout from Zitadel Cloud's console and find the `POST /bff/backchannel-logout` trace.
 * Stretch: move `identity-signing-key` into Key Vault (`AddAzureKeyVault`) and read it with the managed identity.

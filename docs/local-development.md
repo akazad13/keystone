@@ -83,6 +83,10 @@ Hot reload works: edits to the React apps show up immediately (Vite's HMR goes t
 * Stop Zitadel: `docker compose down` in `zitadel/`. Its data survives too.
 * Reset Zitadel completely: `docker compose down -v`, then `docker compose up -d --wait` and `pwsh ./setup.ps1` again.
 
+### Preview the production build
+
+`pwsh ./scripts/preview-production.ps1` builds both SPAs and runs the BFF the way it runs in Azure (Production mode, static files from `artifacts/wwwroot`, no Vite proxy). See [azure-deployment.md, step 0](azure-deployment.md#step-0-preview-the-production-build-locally).
+
 ### Add a database migration
 
 ```powershell
