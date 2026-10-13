@@ -29,6 +29,8 @@ dotnet run --project Keystone.AppHost
 
 Open <https://localhost:7003> (portal) or <https://localhost:7003/admin/> (admin) and sign in as `alice` (Admin) or `bob` (User); the password is in `zitadel/setup.ps1`. The Aspire dashboard link is printed in the console.
 
+Run the unit tests with `dotnet test` from the repository root. They need no Docker, Zitadel or database.
+
 ## Documentation
 
 | Read this | To |
@@ -50,6 +52,7 @@ Keystone.CoreApi/            Business API (EF Core, SQL, Redis cache)
 keystone/                    Customer portal (React + Vite), served at /
 keystone-admin/              Admin dashboard (React + Vite), served at /admin/
 zitadel/                     Local Zitadel (official compose) and setup script
+tests/                       Unit tests for the BFF and Core API (xUnit, no Docker needed)
 docs/                        Guides
 Directory.Packages.props     All NuGet package versions (central package management)
 ```

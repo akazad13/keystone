@@ -175,24 +175,8 @@ if (!app.Environment.IsDevelopment())
     app.UseStaticFiles();
 }
 
-// CSRF defence for API calls, checked before anything else: a cross-site page can make the browser
-// send a form POST with our cookie, but it cannot add a custom header without a CORS preflight,
-// which the BFF never grants.
-app.Use(async (context, next) =>
-{
-    var request = context.Request;
-    var isUnsafeApiCall = request.Path.StartsWithSegments("/api")
-        && !HttpMethods.IsGet(request.Method) && !HttpMethods.IsHead(request.Method) && !HttpMethods.IsOptions(request.Method)
-        && !request.Path.Value!.EndsWith("/auth/logout", StringComparison.Ordinal);
-
-    if (isUnsafeApiCall && request.Headers["X-CSRF"] != "1")
-    {
-        context.Response.StatusCode = StatusCodes.Status400BadRequest;
-        return;
-    }
-
-    await next();
-});
+// CSRF defence for API calls (X-CSRF: 1 on unsafe methods), checked before anything else.
+app.UseCsrfHeaderCheck();
 
 app.UseAuthentication();
 app.UseAuthorization();

@@ -87,6 +87,21 @@ Hot reload works: edits to the React apps show up immediately (Vite's HMR goes t
 
 `pwsh ./scripts/preview-production.ps1` builds both SPAs and runs the BFF the way it runs in Azure (Production mode, static files from `artifacts/wwwroot`, no Vite proxy). See [azure-deployment.md, step 0](azure-deployment.md#step-0-preview-the-production-build-locally).
 
+### Run the tests
+
+```powershell
+dotnet test
+```
+
+Two xUnit projects under `tests/`, both fully in memory (no Docker, Zitadel, SQL Server or Redis):
+
+| Project | Covers | How it fakes the outside world |
+|---------|--------|--------------------------------|
+| `Keystone.Bff.Tests` | Session store, token refresh (incl. concurrent refresh), token exchange and its cache, logout token validation (every step of spec section 2.6), CSRF check, step-up check, login/logout/`me`, sessions and back-channel logout endpoints | `FakeRedis` (an in-memory `IDatabase` built with `DispatchProxy`), `TestIdentityProvider` (signing key, logout tokens, stub token endpoint), test authentication handlers on a `TestServer` |
+| `Keystone.CoreApi.Tests` | Project service (owner isolation, cache), just-in-time user provisioning (incl. the insert race), validators, project/admin/whoami endpoints with the real policies | SQLite in-memory (enforces the unique and foreign keys), `MemoryDistributedCache`, a header-based test authentication scheme on a `TestServer` |
+
+Mocking libraries are not used (Moq is banned in this organisation); fakes are small hand-written classes in each project's `Fakes` folder.
+
 ### Add a database migration
 
 ```powershell

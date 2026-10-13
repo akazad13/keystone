@@ -35,7 +35,7 @@ All work is on `main` (no remote configured). One commit per feature:
 
 * The actual Azure deployment (feature 7, second half). It needs an Azure subscription and a Zitadel Cloud instance; follow `docs/azure-deployment.md` from step 1.
 * Items in the hardening checklist at the end of `docs/azure-deployment.md` and the known gaps in `ARCHITECTURE.md` (for example: health probes only mapped in Development, `/connect/token` relies on network isolation only, signing key not in Key Vault).
-* There are no automated tests yet. Verification so far was manual (browser + curl against local Zitadel).
+* Tests cover the BFF and Core API only (`tests/`, 139 unit tests, `dotnet test`). There are no tests yet for the Identity Service, the SPAs, or end to end against Zitadel (that was verified manually in the browser).
 
 ## Architecture in one paragraph
 
@@ -45,6 +45,7 @@ The **BFF** (`Keystone.Bff`, https://localhost:7003) is the only public entry po
 
 * **.NET 10, central package management.** Every NuGet version is pinned exactly in `Directory.Packages.props`; `.csproj` files have `PackageReference` without versions. Do not use floating versions (`9.*` once broke restore on partially published packages).
 * **Banned NuGet packages: Moq and AutoMapper.** Use hand-written fakes/stubs and explicit mapping code.
+* **Tests:** xUnit v3 in `tests/<Project>.Tests`, fakes in each project's `Fakes/` folder (`FakeRedis`, `TestIdentityProvider`, `TestDatabase` on SQLite in-memory, `BffTestHost`/`CoreApiTestHost` on `TestServer`). Tests must not need Docker or Zitadel. Logic in `Program.cs` is hard to test: put middleware and policies in extension methods (see `Middleware/CsrfProtection.cs`, `Authorization/KeystoneAuthorization.cs`) and test those. Every new feature and bug fix gets tests in the same commit.
 * **Writing style in code comments and docs:** no em dashes.
 * **New API features** go in `Keystone.CoreApi/Endpoints`, are reached through the BFF prefixes, and are owner-scoped: the owner always comes from the token (`ICurrentUserService`), never from the request body.
 * **Mutating calls from the SPAs** must send `X-CSRF: 1` (the `api` helper in `src/lib/api.ts` does it). The BFF rejects unsafe methods without it.
@@ -66,6 +67,7 @@ The **BFF** (`Keystone.Bff`, https://localhost:7003) is the only public entry po
 * **Provisioning middleware in the Core API runs between `UseAuthentication` and `UseAuthorization`,** so `LastSeenAt` is updated even for requests that end in 403.
 * **The `useAuth` hooks map a 401 from `/me` to `null`,** otherwise React Query keeps showing a user whose session ended elsewhere.
 * **Admin SPA fallback in Production is `/admin/{*path:nonfile}`.** Without `nonfile`, missing JS assets get `index.html` and the admin app is blank. Use `scripts/preview-production.ps1` to test production paths before deploying.
+* **StackExchange.Redis 2.13 added `StringSetAsync(key, value, Expiration, ValueCondition, ...)` overloads,** and a `TimeSpan` expiry now binds to them. `FakeRedis` reads `Expiration` by reflection; if a Redis upgrade breaks the fake, it throws `NotSupportedException` naming the method.
 * **Minimal API handlers returning `Task<IResult>` from a method group** may need a `(Delegate)` cast (ASP0016), otherwise the endpoint returns an empty 200.
 
 ## Local environment cheat sheet
@@ -73,6 +75,7 @@ The **BFF** (`Keystone.Bff`, https://localhost:7003) is the only public entry po
 ```powershell
 cd zitadel; docker compose up -d --wait; pwsh ./setup.ps1; cd ..   # first time only for setup.ps1
 dotnet run --project Keystone.AppHost                               # https://localhost:7003
+dotnet test                                                         # unit tests, no Docker needed
 pwsh ./scripts/preview-production.ps1                               # Production-mode BFF locally
 cd zitadel; docker compose down                                     # stop Zitadel (data kept)
 ```

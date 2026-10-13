@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Keystone.CoreApi.Authorization;
 using Keystone.CoreApi.Data;
 using Keystone.CoreApi.Endpoints;
 using Keystone.CoreApi.Services;
@@ -42,10 +43,8 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
     .Configure<IHttpClientFactory>((options, httpClientFactory) =>
         options.Backchannel = httpClientFactory.CreateClient("identity-service"));
 
-// Authorization policies
-builder.Services.AddAuthorizationBuilder()
-    .AddPolicy("Admin", policy => policy.RequireRole("Admin"))
-    .AddPolicy("User", policy => policy.RequireRole("Admin", "User"));
+// Authorization policies "Admin" and "User"
+builder.Services.AddAuthorizationBuilder().AddKeystonePolicies();
 
 // FluentValidation
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
@@ -75,18 +74,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseAuthentication();
 
-// Every authenticated call provisions the caller's Users row (first call) and refreshes it,
-// so the row exists and LastSeenAt is current whichever endpoint the user hits. It runs before
-// UseAuthorization so that calls ending in 403 still count as the user being seen.
-app.Use(async (context, next) =>
-{
-    if (context.User.Identity?.IsAuthenticated == true)
-    {
-        await context.RequestServices.GetRequiredService<ICurrentUserService>().GetOrCreateAsync(context.RequestAborted);
-    }
-
-    await next();
-});
+// Provision/refresh the caller's Users row. Before UseAuthorization, so 403 calls still count as "seen".
+app.UseUserProvisioning();
 
 app.UseAuthorization();
 
