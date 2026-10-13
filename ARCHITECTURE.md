@@ -63,7 +63,7 @@ Three rules shape everything:
 |---------|------|----------------|-----------|
 | `Keystone.AppHost` | Aspire orchestrator: declares every resource, its wiring and its Azure mapping | (dev tool) | `Program.cs` |
 | `Keystone.ServiceDefaults` | OpenTelemetry, health checks, HTTP resilience, service discovery for every .NET service | (library) | `Extensions.cs` |
-| `Keystone.Bff` | OIDC client (relying party), server-side sessions, CSRF defence, reverse proxy to the Core API, static frontends, back-channel logout receiver | **Internet** | `Program.cs`, `Endpoints/`, `Services/RedisTicketStore.cs`, `Services/SessionTokenService.cs`, `Services/LogoutTokenValidator.cs` |
+| `Keystone.Bff` | OIDC client (relying party), server-side sessions (listable and revocable), token refresh, CSRF defence, reverse proxy to the Core API, static frontends, back-channel logout receiver | **Internet** | `Program.cs`, `Endpoints/`, `Services/RedisTicketStore.cs`, `Services/SessionTokenService.cs`, `Services/TokenRefresher.cs`, `Services/LogoutTokenValidator.cs` |
 | `Keystone.IdentityService` | Exchanges an IdP access token for a Keystone access token; publishes its signing keys; the only code that knows Zitadel's claim formats | Private network | `Endpoints/AuthEndpoints.cs`, `Services/UserService.cs`, `Services/TokenService.cs`, `Services/KeyManager.cs` |
 | `Keystone.CoreApi` | Business API (projects). Validates Keystone JWTs offline; EF Core + SQL; Redis cache | Private network | `Program.cs`, `Endpoints/ProjectEndpoints.cs`, `Data/` |
 | `keystone` | Customer portal SPA (React, Vite, TanStack Router/Query) | Served by the BFF at `/` | `src/hooks/useAuth.ts`, `src/lib/api.ts` |

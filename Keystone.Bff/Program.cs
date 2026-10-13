@@ -55,6 +55,14 @@ builder.Services.AddAuthentication(options =>
     options.ExpireTimeSpan = TimeSpan.FromHours(8);
     options.SlidingExpiration = true;
 
+    // Remember which browser/device created the session, for the "Your sessions" page.
+    options.Events.OnSigningIn = context =>
+    {
+        var userAgent = context.HttpContext.Request.Headers.UserAgent.ToString();
+        context.Properties.Items[RedisTicketStore.UserAgentItem] = userAgent.Length > 256 ? userAgent[..256] : userAgent;
+        return Task.CompletedTask;
+    };
+
     options.Events.OnRedirectToLogin = context =>
     {
         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -192,6 +200,8 @@ app.UseRateLimiter();
 // --- Endpoints ---
 app.MapAuthEndpoints("/api/keystone", appRoot: "/");
 app.MapAuthEndpoints("/api/keystone-admin", appRoot: "/admin/");
+app.MapSessionEndpoints("/api/keystone");
+app.MapSessionEndpoints("/api/keystone-admin");
 app.MapBackChannelLogout();
 app.MapReverseProxy();
 app.MapDefaultEndpoints();

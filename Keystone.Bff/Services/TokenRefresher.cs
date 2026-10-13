@@ -123,8 +123,8 @@ public sealed class TokenRefresher
                 ticket.Properties.UpdateTokenValue("id_token", response.IdToken);
             }
 
-            // Update the session in place. HttpContext.SignInAsync would create a new session id and
-            // break the other requests of this user that are still using the current cookie.
+            // Write back the ticket we re-read under the lock. HttpContext.SignInAsync would instead save
+            // this request's own copy of the ticket, which may be stale if another request refreshed first.
             await _sessions.RenewAsync(sessionId, ticket);
 
             _logger.LogInformation("Refreshed identity-provider tokens of session {SessionId}; new access token expires {ExpiresAt}",

@@ -18,6 +18,7 @@ namespace Keystone.Bff.Services;
 public sealed class RedisTicketStore : ITicketStore
 {
     public const string SessionIdItem = "keystone.session_id";
+    public const string UserAgentItem = "keystone.user_agent";
 
     private const string KeyPrefix = "keystone:bff:session:";
     private static readonly TimeSpan DefaultLifetime = TimeSpan.FromHours(8);
@@ -63,6 +64,34 @@ public sealed class RedisTicketStore : ITicketStore
     }
 
     public async Task RemoveAsync(string key) => await DeleteSessionAsync(key);
+
+    /// <summary>The user's live sessions, newest first. Index entries whose session is gone are pruned.</summary>
+    public async Task<IReadOnlyList<SessionInfo>> ListBySubjectAsync(string sub)
+    {
+        var db = _redis.GetDatabase();
+        var indexKey = IndexKey("sub", sub)!;
+
+        var sessions = new List<SessionInfo>();
+        foreach (var member in await db.SetMembersAsync(indexKey))
+        {
+            var sessionId = member.ToString();
+            var ticket = await RetrieveAsync(sessionId);
+            if (ticket is null)
+            {
+                await db.SetRemoveAsync(indexKey, member);
+                continue;
+            }
+
+            ticket.Properties.Items.TryGetValue(UserAgentItem, out var userAgent);
+            sessions.Add(new SessionInfo(sessionId, ticket.Properties.IssuedUtc, ticket.Properties.ExpiresUtc, userAgent));
+        }
+
+        return [.. sessions.OrderByDescending(s => s.IssuedUtc)];
+    }
+
+    /// <summary>True when <paramref name="sessionId"/> is one of the user's sessions.</summary>
+    public Task<bool> BelongsToAsync(string sessionId, string sub) =>
+        _redis.GetDatabase().SetContainsAsync(IndexKey("sub", sub)!, sessionId);
 
     /// <summary>Deletes every session created from one identity-provider session.</summary>
     public Task<int> RemoveByIdentityProviderSessionAsync(string sid) => RemoveIndexedAsync(IndexKey("sid", sid)!);
@@ -136,6 +165,9 @@ public sealed class RedisTicketStore : ITicketStore
     private static string? IndexKey(string claim, string? value) =>
         string.IsNullOrEmpty(value) ? null : $"{KeyPrefix}{claim}:{value}";
 }
+
+/// <summary>A session as shown to its owner.</summary>
+public sealed record SessionInfo(string Id, DateTimeOffset? IssuedUtc, DateTimeOffset? ExpiresUtc, string? UserAgent);
 
 /// <summary>Plugs <see cref="RedisTicketStore"/> into the cookie handler once DI is available.</summary>
 public sealed class ConfigureCookieSessionStore(RedisTicketStore store)

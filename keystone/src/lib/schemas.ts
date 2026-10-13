@@ -81,3 +81,14 @@ export const sessionUserSchema = z.object({
 });
 
 export type SessionUser = z.infer<typeof sessionUserSchema>;
+
+/** One of the user's BFF sessions (GET {prefix}/sessions). */
+export const bffSessionSchema = z.object({
+  id: z.string(),
+  signedInAt: z.string().nullable(),
+  expiresAt: z.string().nullable(),
+  userAgent: z.string().nullable(),
+  current: z.boolean(),
+});
+
+export type BffSession = z.infer<typeof bffSessionSchema>;

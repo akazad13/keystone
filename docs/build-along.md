@@ -78,7 +78,7 @@ Before you start: get the app running ([local-development.md](local-development.
 
 * Where: `Keystone.Bff/Services/SessionTokenService.cs`, at the comment about refreshing.
 * The token endpoint URL comes from discovery: inject `IOptionsMonitor<OpenIdConnectOptions>` and use `options.ConfigurationManager` (exactly like `LogoutTokenValidator`). Post `grant_type=refresh_token`, `refresh_token`, `client_id`, `client_secret`.
-* Save **all** returned tokens (`access_token`, the new `refresh_token`, a new `expires_at`) back into the session. Pitfall: `HttpContext.SignInAsync` with a session store creates a **new** session id, so requests already in flight with the old cookie would fail. Update the stored ticket in place with `RedisTicketStore.RenewAsync(sessionId, ticket)` instead.
+* Save **all** returned tokens (`access_token`, the new `refresh_token`, a new `expires_at`) back into the session. Pitfall: `HttpContext.SignInAsync` saves the ticket this request loaded, which may already be stale if another request refreshed in the meantime. Re-read the session from `RedisTicketStore` while holding a lock, update that copy, and store it with `RenewAsync(sessionId, ticket)`.
 * Race: two API calls arrive together, both see an expired token, both refresh, the second refresh uses a rotated (dead) token. Prevent it with a short Redis lock per session (`SET key value NX PX 10000`), or by re-reading the session after acquiring the lock.
 * If the refresh fails (`invalid_grant`), the session is over: delete it so the user gets a clean 401.
 

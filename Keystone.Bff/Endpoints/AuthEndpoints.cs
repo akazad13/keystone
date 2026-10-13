@@ -17,7 +17,7 @@ public static class AuthEndpoints
     {
         var group = endpoints.MapGroup(prefix);
 
-        group.MapGet("/auth/login", (string? returnUrl) => HandleLogin(returnUrl, appRoot));
+        group.MapGet("/auth/login", (HttpContext httpContext, string? returnUrl) => HandleLogin(httpContext, returnUrl, appRoot));
         group.MapPost("/auth/logout", () => HandleLogout(appRoot)).DisableAntiforgery();
         // Cast so the IResult is written to the response (a bare Func<HttpContext, Task> would be
         // treated as a RequestDelegate and its result discarded).
@@ -31,8 +31,16 @@ public static class AuthEndpoints
     /// The OIDC handler redirects the browser to the identity provider; the provider redirects back to
     /// /signin-oidc, the handler redeems the code, creates the session and finally redirects to returnUrl.
     /// </summary>
-    private static IResult HandleLogin(string? returnUrl, string appRoot)
+    private static async Task<IResult> HandleLogin(HttpContext httpContext, string? returnUrl, string appRoot)
     {
+        // Signing in again while signed in (switching account, re-authenticating): end the current
+        // session first. The new login creates a new session, and the old one would otherwise linger
+        // in Redis with nobody holding its cookie.
+        if (httpContext.User.Identity?.IsAuthenticated == true)
+        {
+            await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        }
+
         var properties = new AuthenticationProperties
         {
             // Only allow local URLs, otherwise the login endpoint becomes an open redirect.

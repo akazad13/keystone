@@ -145,7 +145,19 @@ The cookie `__Host-keystone`:
 | Content | random session id, encrypted | The real data is in Redis |
 | Lifetime | 8 hours, sliding | Independent of Zitadel's token lifetimes |
 
-`GET /api/{app}/me` returns the session's claims. The SPAs call it to decide whether to show the app or a **Sign in** button (`useAuth.ts`).
+`GET /api/{app}/me` returns the session's claims. The SPAs call it to decide whether to show the app or a **Sign in** button (`useAuth.ts`). A 401 is treated as "signed out" (not as an error), so a session that ends elsewhere is noticed the next time the query runs.
+
+### 4.1 Managing sessions
+
+A user can be signed in from several browsers; each has its own BFF session, all indexed under the user's `sub`. The portal's **Sessions** page (`keystone/src/routes/sessions.tsx`) uses `Keystone.Bff/Endpoints/SessionEndpoints.cs`:
+
+| Endpoint | Does |
+|----------|------|
+| `GET /api/{app}/sessions` | Lists the caller's sessions (sign-in time, expiry, browser), marking the current one |
+| `POST /api/{app}/sessions/{id}/revoke` | Ends one of the caller's sessions; another user's session id gives 404 |
+| `POST /api/{app}/sessions/revoke-all` | Ends all of them ("sign out everywhere"), including this browser |
+
+These end **Keystone** sessions. The Zitadel SSO session in each browser survives, so signing in there again is silent (compare with RP-initiated logout in section 6, which ends both). Signing in again while already signed in ends the current Keystone session first, so no orphaned sessions pile up.
 
 ---
 
@@ -201,7 +213,7 @@ grant_type=refresh_token&refresh_token=<from the session>&client_id=...&client_s
 Things to notice in the code:
 
 * **Rotation.** Zitadel returns a *new* refresh token each time and the old one stops working, so the new one is saved into the session immediately.
-* **In-place update.** The session is rewritten with `RedisTicketStore.RenewAsync` under the same id. `HttpContext.SignInAsync` would mint a new session id, and every other request still carrying the old cookie would fail.
+* **In-place update.** The session is rewritten with `RedisTicketStore.RenewAsync`, using the ticket re-read from Redis while holding the lock. `HttpContext.SignInAsync` would save this request's own copy of the ticket instead, which is stale if another request refreshed first.
 * **One refresh at a time.** With rotation, two simultaneous refreshes would make the second one present an already-used refresh token. A Redis lock (`...:refresh-lock`) serializes them; the waiting request re-reads the session and finds the fresh token.
 * **Rejected means over.** If Zitadel answers `invalid_grant` (refresh token expired, revoked, or its SSO session ended), the session is deleted and the user gets a clean 401.
 * **The cache follows the upstream token.** A cached Keystone token never lives longer than the Zitadel access token it was exchanged from.

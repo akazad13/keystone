@@ -12,9 +12,19 @@ export function useAuth() {
     isLoading,
     isError,
     error,
-  } = useQuery<SessionUser, ApiError>({
+  } = useQuery<SessionUser | null, ApiError>({
     queryKey: ["auth", "me"],
-    queryFn: () => api.get<SessionUser>("/me"),
+    // 401 means "no session": return null instead of failing. A failed query would keep showing the
+    // last successful user, so a session ended elsewhere (back-channel logout, "sign out everywhere")
+    // would go unnoticed.
+    queryFn: async () => {
+      try {
+        return await api.get<SessionUser>("/me");
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401) return null;
+        throw error;
+      }
+    },
     retry: false,
     // Re-check when the tab regains focus, so a session ended elsewhere
     // (e.g. by a back-channel logout) shows up without a reload.

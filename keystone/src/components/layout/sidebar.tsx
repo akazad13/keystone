@@ -4,6 +4,7 @@ import {
   FolderOpen,
   Home,
   LayoutDashboard,
+  MonitorSmartphone,
   Rocket,
   Settings,
   Users,
@@ -18,6 +19,7 @@ const navItems = [
   { to: "/dashboard", label: "Team", icon: Users },
   { to: "/dashboard", label: "Settings", icon: Settings },
   { to: "/me", label: "Who am I", icon: Fingerprint },
+  { to: "/sessions", label: "Sessions", icon: MonitorSmartphone },
 ] as const;
 
 export function Sidebar() {
