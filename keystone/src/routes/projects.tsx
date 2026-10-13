@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, loginUrl, needsReauthentication } from "@/lib/api";
 import { createProjectSchema, type CreateProjectInput, type Project } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 
@@ -63,6 +63,13 @@ function ProjectsPage() {
   const remove = useMutation({
     mutationFn: (id: string) => api.delete(`/projects/${id}`),
     onSuccess: refresh,
+    onError: (error) => {
+      // Deleting needs a sign-in within the last few minutes. Send the user through the identity
+      // provider with prompt=login; they come back here and can delete again.
+      if (needsReauthentication(error) && confirm("For your security, please enter your password again before deleting.")) {
+        window.location.href = loginUrl("/projects", "login");
+      }
+    },
   });
 
   if (isLoading) {
@@ -97,8 +104,13 @@ function ProjectsPage() {
         </p>
       )}
 
-      {(update.isError || remove.isError) && (
-        <p className="text-sm text-red-600">{describeError(update.error ?? remove.error)}</p>
+      {update.isError && <p className="text-sm text-red-600">{describeError(update.error)}</p>}
+      {remove.isError && (
+        <p className="text-sm text-red-600">
+          {needsReauthentication(remove.error)
+            ? "Deleting needs a recent sign-in. Click Delete again to confirm your password."
+            : describeError(remove.error)}
+        </p>
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">

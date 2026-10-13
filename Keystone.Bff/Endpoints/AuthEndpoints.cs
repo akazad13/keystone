@@ -17,7 +17,8 @@ public static class AuthEndpoints
     {
         var group = endpoints.MapGroup(prefix);
 
-        group.MapGet("/auth/login", (HttpContext httpContext, string? returnUrl) => HandleLogin(httpContext, returnUrl, appRoot));
+        group.MapGet("/auth/login", (HttpContext httpContext, string? returnUrl, string? prompt) =>
+            HandleLogin(httpContext, returnUrl, prompt, appRoot));
         group.MapPost("/auth/logout", () => HandleLogout(appRoot)).DisableAntiforgery();
         // Cast so the IResult is written to the response (a bare Func<HttpContext, Task> would be
         // treated as a RequestDelegate and its result discarded).
@@ -30,8 +31,12 @@ public static class AuthEndpoints
     /// GET {prefix}/auth/login - Starts the OIDC authorization code flow (with PKCE).
     /// The OIDC handler redirects the browser to the identity provider; the provider redirects back to
     /// /signin-oidc, the handler redeems the code, creates the session and finally redirects to returnUrl.
+    /// <para>
+    /// <c>?prompt=login</c> forces the identity provider to ask for credentials again even when the
+    /// user has an SSO session (step-up before sensitive actions). Other prompt values are ignored.
+    /// </para>
     /// </summary>
-    private static async Task<IResult> HandleLogin(HttpContext httpContext, string? returnUrl, string appRoot)
+    private static async Task<IResult> HandleLogin(HttpContext httpContext, string? returnUrl, string? prompt, string appRoot)
     {
         // Signing in again while signed in (switching account, re-authenticating): end the current
         // session first. The new login creates a new session, and the old one would otherwise linger
@@ -41,10 +46,11 @@ public static class AuthEndpoints
             await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         }
 
-        var properties = new AuthenticationProperties
+        var properties = new OpenIdConnectChallengeProperties
         {
             // Only allow local URLs, otherwise the login endpoint becomes an open redirect.
-            RedirectUri = HttpContextExtensions.IsLocalUrl(returnUrl) ? returnUrl : appRoot
+            RedirectUri = HttpContextExtensions.IsLocalUrl(returnUrl) ? returnUrl : appRoot,
+            Prompt = prompt == "login" ? "login" : null
         };
 
         return Results.Challenge(properties, [OpenIdConnectDefaults.AuthenticationScheme]);

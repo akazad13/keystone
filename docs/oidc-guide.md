@@ -220,6 +220,27 @@ Things to notice in the code:
 
 **See it:** shorten the access token lifetime in the Zitadel console (Default settings > OIDC token lifetimes and expiration, e.g. 2 minutes), sign in, wait a little over a minute, and call the API. The Aspire trace shows the BFF calling Zitadel's token endpoint before the token exchange. Fire several calls at once (`Promise.all` in the browser console): Zitadel's log still shows only one refresh.
 
+### 5.2 Step-up: re-authenticate before deleting
+
+A BFF session lives for hours, and anyone at an unlocked computer can use it. For destructive calls Keystone also wants proof that the user typed their password *recently*.
+
+* The ID token's **`auth_time`** claim says when the user last authenticated at Zitadel (seconds since 1970). It ends up in the session (see the "Who am I" page). A silent SSO login does **not** refresh it.
+* `Keystone.Bff/Middleware/RecentAuthentication.cs` runs inside YARP's proxy pipeline. For any proxied `DELETE` whose session `auth_time` is older than 5 minutes, it answers with the **RFC 9470** (OAuth 2.0 Step-Up Authentication Challenge) response:
+
+  ```http
+  HTTP/1.1 401 Unauthorized
+  WWW-Authenticate: Bearer error="insufficient_user_authentication", error_description="Sign in again to continue", max_age=300
+
+  {"error":"insufficient_user_authentication","maxAge":300}
+  ```
+
+* The portal (`needsReauthentication` in `src/lib/api.ts`) recognises it and sends the user to `/api/keystone/auth/login?prompt=login&returnUrl=/projects`.
+* `prompt=login` tells Zitadel to ask for credentials **even though an SSO session exists**. The new ID token carries a fresh `auth_time`, and the next `DELETE` goes through.
+
+Related request parameters worth knowing: `max_age=N` (re-authenticate if the last authentication is older than N seconds), `acr_values` (ask for a stronger method such as MFA; the `acr` and `amr` claims say what was used).
+
+**See it:** sign in silently (SSO), open the browser console and send a `DELETE` for one of your projects: 401 with the header above. Delete from the Projects page instead: you are asked for your password, come back, and the delete works.
+
 ---
 
 ## 6. Logout

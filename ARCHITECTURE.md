@@ -244,6 +244,7 @@ Aspire 9 is out of support. Aspire 13 generates the Bicep, builds the images and
 | Open redirect after login | `returnUrl` must be a local path | `HttpContextExtensions.IsLocalUrl` |
 | Forged or replayed logout tokens | Signature, issuer, audience, lifetime, `events`, no `nonce`, `jti` replay cache | `LogoutTokenValidator` |
 | Stolen internal token | 15-minute lifetime, audience-bound (`core-api`), never leaves the server side | Identity Service |
+| Unattended session used for destructive actions | Step-up (RFC 9470): DELETE needs `auth_time` within 5 minutes, otherwise `insufficient_user_authentication` and a `prompt=login` round trip | BFF `Middleware/RecentAuthentication.cs` |
 | Abuse | Per-user fixed-window rate limit on the proxied API | BFF |
 | Secrets in config | Managed identities for SQL/Redis; client secret and signing key as Container App secrets | AppHost |
 

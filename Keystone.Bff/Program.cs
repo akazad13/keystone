@@ -1,6 +1,7 @@
 using System.Threading.RateLimiting;
 using Keystone.Bff.Endpoints;
 using Keystone.Bff.Extensions;
+using Keystone.Bff.Middleware;
 using Keystone.Bff.Services;
 using Keystone.ServiceDefaults;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -203,7 +204,15 @@ app.MapAuthEndpoints("/api/keystone-admin", appRoot: "/admin/");
 app.MapSessionEndpoints("/api/keystone");
 app.MapSessionEndpoints("/api/keystone-admin");
 app.MapBackChannelLogout();
-app.MapReverseProxy();
+// Proxied API calls: deleting anything needs a sign-in within the last 5 minutes (step-up, RFC 9470).
+// Passing a pipeline replaces YARP's default one, so its standard steps are added back explicitly.
+app.MapReverseProxy(proxy =>
+{
+    proxy.RequireRecentAuthenticationForDeletes(TimeSpan.FromMinutes(5));
+    proxy.UseSessionAffinity();
+    proxy.UseLoadBalancing();
+    proxy.UsePassiveHealthChecks();
+});
 app.MapDefaultEndpoints();
 
 if (!app.Environment.IsDevelopment())

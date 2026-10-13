@@ -1,8 +1,17 @@
 export const API_BASE = "/api/keystone";
 
-/** Starts the OIDC login through the BFF and comes back to the current page. */
-export function loginUrl(returnUrl: string = window.location.pathname): string {
-  return `${API_BASE}/auth/login?returnUrl=${encodeURIComponent(returnUrl)}`;
+/**
+ * Starts the OIDC login through the BFF and comes back to the current page.
+ * prompt "login" makes Zitadel ask for the password even when the user has an SSO session.
+ */
+export function loginUrl(returnUrl: string = window.location.pathname, prompt?: "login"): string {
+  const url = `${API_BASE}/auth/login?returnUrl=${encodeURIComponent(returnUrl)}`;
+  return prompt ? `${url}&prompt=${prompt}` : url;
+}
+
+/** True for the BFF's step-up challenge (RFC 9470): the action needs a recent sign-in. */
+export function needsReauthentication(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 401 && error.message.includes("insufficient_user_authentication");
 }
 
 export class ApiError extends Error {
