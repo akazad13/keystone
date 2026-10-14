@@ -1,7 +1,7 @@
 using System.Threading.RateLimiting;
 using Keystone.Bff.Endpoints;
-using Keystone.Bff.Extensions;
 using Keystone.Bff.Middleware;
+using Keystone.Bff.Proxy;
 using Keystone.Bff.Services;
 using Keystone.ServiceDefaults;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -141,27 +141,8 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
     .AddServiceDiscoveryDestinationResolver()
-    .AddTransforms(context =>
-    {
-        // Only API routes carry a token; the dev-time frontend routes do not.
-        if (context.Route.ClusterId != "core-api")
-        {
-            return;
-        }
-
-        context.AddRequestTransform(async transformContext =>
-        {
-            // Never forward the browser's cookies to the API.
-            transformContext.ProxyRequest.Headers.Remove("Cookie");
-
-            var token = await transformContext.HttpContext.GetTokenFromSessionAsync();
-            if (!string.IsNullOrEmpty(token))
-            {
-                transformContext.ProxyRequest.Headers.Authorization =
-                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-            }
-        });
-    });
+    // API calls: drop the cookie, attach the session's Keystone access token.
+    .AddTransforms(CoreApiTokenTransform.Apply);
 
 var app = builder.Build();
 

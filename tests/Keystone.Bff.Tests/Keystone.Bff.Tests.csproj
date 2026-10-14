@@ -22,4 +22,9 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!-- The proxy tests run YARP with the BFF's real route table. -->
+  <ItemGroup>
+    <None Include="..\..\Keystone.Bff\appsettings.json" Link="bff.appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

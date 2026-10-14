@@ -163,7 +163,7 @@ These end **Keystone** sessions. The Zitadel SSO session in each browser survive
 
 ## 5. Calling the API: token exchange
 
-The Core API never receives a Zitadel token. When a request for `/api/keystone/**` arrives, the YARP transform in `Keystone.Bff/Program.cs` calls `SessionTokenService.GetAccessTokenAsync`:
+The Core API never receives a Zitadel token. When a request for `/api/keystone/**` arrives, the YARP transform in `Keystone.Bff/Proxy/CoreApiTokenTransform.cs` (registered in `Program.cs`) drops the browser's `Cookie` and `Authorization` headers and calls `SessionTokenService.GetAccessTokenAsync`:
 
 1. If a Keystone token is cached for this session, use it.
 2. Make sure the session's Zitadel access token is still valid; if it expires within a minute, refresh it first (section 5.1).

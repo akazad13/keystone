@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Security.Claims;
+using Keystone.Bff.Proxy;
 using Yarp.ReverseProxy.Model;
 
 namespace Keystone.Bff.Middleware;
@@ -23,7 +24,7 @@ public static class RecentAuthentication
     {
         proxy.Use(async (context, next) =>
         {
-            var isApiCall = context.GetReverseProxyFeature().Route.Config.ClusterId == "core-api";
+            var isApiCall = context.GetReverseProxyFeature().Route.Config.ClusterId == CoreApiTokenTransform.ClusterId;
 
             if (isApiCall && HttpMethods.IsDelete(context.Request.Method) && !AuthenticatedWithin(context.User, maxAge))
             {

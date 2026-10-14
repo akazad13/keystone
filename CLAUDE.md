@@ -35,7 +35,7 @@ All work is on `main` (no remote configured). One commit per feature:
 
 * The actual Azure deployment (feature 7, second half). It needs an Azure subscription and a Zitadel Cloud instance; follow `docs/azure-deployment.md` from step 1.
 * Items in the hardening checklist at the end of `docs/azure-deployment.md` and the known gaps in `ARCHITECTURE.md` (for example: health probes only mapped in Development, `/connect/token` relies on network isolation only, signing key not in Key Vault).
-* Tests cover the three .NET services (`tests/`, 193 unit tests, `dotnet test`). Not covered: the YARP request transform in `Keystone.Bff/Program.cs` (attaches the token, strips cookies), the Core API's JwtBearer configuration, the SPAs, and end to end against Zitadel (verified manually in the browser).
+* Tests cover the three .NET services (`tests/`, 207 unit tests, `dotnet test`), including the BFF proxy through real YARP with the real route table. Not covered: the Core API's JwtBearer configuration, the SPAs, and end to end against Zitadel (verified manually in the browser).
 
 ## Architecture in one paragraph
 
