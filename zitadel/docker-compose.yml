@@ -1,6 +1,6 @@
 # Local ZITADEL for Keystone development.
 # Based on ZITADEL's official compose file (deploy/compose in github.com/zitadel/zitadel),
-# with one addition marked "Keystone addition". Settings live in .env (insecure local defaults).
+# with additions marked "Keystone addition". Settings live in .env (insecure local defaults).
 # Start: docker compose up -d --wait     Stop: docker compose down     Reset: docker compose down -v
 name: zitadel
 
@@ -81,6 +81,10 @@ services:
       ZITADEL_CACHES_MILESTONES_CONNECTOR: ${ZITADEL_CACHES_MILESTONES_CONNECTOR}
       ZITADEL_CACHES_ORGANIZATION_CONNECTOR: ${ZITADEL_CACHES_ORGANIZATION_CONNECTOR}
 
+    # Keystone addition: Docker Desktop defines host.docker.internal; plain Docker on Linux (e.g. CI)
+    # needs it mapped to the host so back-channel logout can reach the BFF.
+    extra_hosts:
+      - host.docker.internal:host-gateway
     healthcheck:
       test:
         - CMD

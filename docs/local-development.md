@@ -119,6 +119,8 @@ cd ..\keystone-admin; npm test
 
 With the stack running (Zitadel and the AppHost), the end-to-end tests drive a real browser through Zitadel's login UI: `cd e2e; npm install; npm test`. See [e2e/README.md](../e2e/README.md).
 
+GitHub Actions runs all three suites on every push to `main` and every pull request ([.github/workflows/ci.yml](../.github/workflows/ci.yml)): .NET tests and the React apps (build and tests) in parallel, then the end-to-end tests against a fresh Zitadel and the full stack.
+
 ### Add a database migration
 
 ```powershell

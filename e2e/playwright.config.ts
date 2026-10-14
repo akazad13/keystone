@@ -13,9 +13,11 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   retries: 0,
+  forbidOnly: !!process.env.CI,
   timeout: 60_000,
   expect: { timeout: 10_000 },
-  reporter: [["list"], ["html", { open: "never" }]],
+  // On GitHub Actions, failures are also annotated on the pull request.
+  reporter: process.env.CI ? [["github"], ["list"], ["html", { open: "never" }]] : [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: environment.baseUrl,
     // Microsoft Edge is installed on Windows, so no browser download is needed. Set E2E_BROWSER_CHANNEL

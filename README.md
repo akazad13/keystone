@@ -29,7 +29,7 @@ dotnet run --project Keystone.AppHost
 
 Open <https://localhost:7003> (portal) or <https://localhost:7003/admin/> (admin) and sign in as `alice` (Admin) or `bob` (User); the password is in `zitadel/setup.ps1`. The Aspire dashboard link is printed in the console.
 
-Run the tests with `dotnet test` from the repository root (.NET services) and `npm test` in `keystone/` and `keystone-admin/` (React apps). They need no Docker, Zitadel or database. The end-to-end tests in [e2e/](e2e/README.md) drive a real browser against the running stack.
+Run the tests with `dotnet test` from the repository root (.NET services) and `npm test` in `keystone/` and `keystone-admin/` (React apps). They need no Docker, Zitadel or database. The end-to-end tests in [e2e/](e2e/README.md) drive a real browser against the running stack. GitHub Actions runs all of them ([.github/workflows/ci.yml](.github/workflows/ci.yml)).
 
 ## Documentation
 

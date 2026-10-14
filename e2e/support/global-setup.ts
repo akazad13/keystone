@@ -1,4 +1,6 @@
-import { environment } from "./environment";
+import { chromium } from "@playwright/test";
+import { environment, users } from "./environment";
+import { callApi, signIn } from "./keystone";
 
 /** Fails fast, with instructions, when the stack is not running. */
 export default async function globalSetup() {
@@ -30,5 +32,31 @@ export default async function globalSetup() {
 
   if (problems.length > 0) {
     throw new Error(`The end-to-end tests need the running stack (see e2e/README.md):\n- ${problems.join("\n- ")}`);
+  }
+
+  await warmUp();
+}
+
+/**
+ * Right after the AppHost starts, the first API call is slow: the token exchange, the Core API's
+ * first database connection and JWKS fetch, and Vite compiling each app on its first page load.
+ * Pay that once here, with generous timeouts, so the tests themselves see a warm stack.
+ */
+async function warmUp() {
+  const browser = await chromium.launch({ channel: environment.browserChannel || undefined });
+  try {
+    const context = await browser.newContext({ baseURL: environment.baseUrl, ignoreHTTPSErrors: true });
+    const page = await context.newPage();
+    page.setDefaultTimeout(120_000);
+
+    await signIn(page, users.alice, "/projects");
+    const projects = await callApi(page, "GET", "/api/keystone/projects");
+    if (projects.status !== 200) throw new Error(`Warm-up: GET /api/keystone/projects answered ${projects.status}.`);
+
+    await page.goto("/admin/");
+    await page.getByRole("heading", { name: "Dashboard Overview" }).waitFor();
+    await page.getByText("Total users").waitFor();
+  } finally {
+    await browser.close();
   }
 }

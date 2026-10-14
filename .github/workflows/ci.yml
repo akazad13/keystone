@@ -1,0 +1,177 @@
+# Runs every test suite: .NET unit tests, React app tests, and the end-to-end tests against a real
+# Zitadel and the whole Keystone stack under the Aspire AppHost. See docs/local-development.md.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  NODE_VERSION: 22
+
+jobs:
+  dotnet:
+    name: .NET unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore Keystone.sln
+
+      - name: Build
+        run: dotnet build Keystone.sln --no-restore --configuration Release
+
+      - name: Test
+        run: >
+          dotnet test Keystone.sln --no-build --configuration Release
+          --logger "trx" --logger "console;verbosity=normal" --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-test-results
+          path: TestResults/
+          if-no-files-found: ignore
+
+  frontend:
+    name: React tests (${{ matrix.app }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [keystone, keystone-admin]
+    defaults:
+      run:
+        working-directory: ${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+
+      - run: npm ci
+
+      # tsc -b checks the app and its tests; vite build proves the production bundle builds.
+      - name: Type-check and build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+  e2e:
+    name: End-to-end tests (Zitadel + Keystone)
+    needs: [dotnet, frontend]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      # Playwright's Chromium instead of Microsoft Edge (the local default).
+      E2E_BROWSER_CHANNEL: ""
+      # On Linux, Docker's host gateway (172.17.0.1, where host.docker.internal points) lies in
+      # 172.16.0.0/12, which zitadel/.env blocks. Overrides .env for this throwaway Zitadel only.
+      ZITADEL_HTTPCLIENT_DENYLIST: localhost,0.0.0.0/8,127.0.0.0/8,169.254.0.0/16,::/128,::1/128,fe80::/10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            keystone/package-lock.json
+            keystone-admin/package-lock.json
+            e2e/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci --prefix keystone
+          npm ci --prefix keystone-admin
+          npm ci --prefix e2e
+          npx --prefix e2e playwright install --with-deps chromium
+
+      # On Linux, --trust adds the certificate to an OpenSSL directory that .NET finds through
+      # SSL_CERT_DIR. The browser does not need it (Playwright ignores HTTPS errors).
+      - name: Create the HTTPS development certificate
+        run: |
+          dotnet dev-certs https --trust || dotnet dev-certs https
+          echo "SSL_CERT_DIR=$HOME/.aspnet/dev-certs/trust:/usr/lib/ssl/certs" >> "$GITHUB_ENV"
+
+      - name: Start Zitadel
+        working-directory: zitadel
+        run: docker compose up -d --wait
+
+      - name: Configure Zitadel (project, app, test users, AppHost user secrets)
+        working-directory: zitadel
+        shell: pwsh
+        run: ./setup.ps1
+
+      # Zitadel calls the BFF's back-channel logout at http://host.docker.internal:5003, i.e. the Docker
+      # host gateway. Aspire serves the BFF on 127.0.0.1:5003 only, so forward the gateway address to it.
+      # (Docker Desktop does this forwarding by itself, which is why local runs need no such step.)
+      - name: Forward back-channel logout calls to the BFF
+        run: |
+          sudo apt-get install -y --no-install-recommends socat
+          gateway=$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')
+          nohup socat "TCP-LISTEN:5003,bind=$gateway,reuseaddr,fork" TCP:127.0.0.1:5003 > socat.log 2>&1 &
+          echo "Forwarding $gateway:5003 to 127.0.0.1:5003"
+
+      - name: Start Keystone (AppHost)
+        run: nohup dotnet run --project Keystone.AppHost > apphost.log 2>&1 &
+
+      # First start pulls SQL Server and Redis images and builds everything, so allow up to 10 minutes.
+      - name: Wait for the BFF
+        run: |
+          for attempt in $(seq 1 120); do
+            status=$(curl -sk -o /dev/null -w '%{http_code}' https://localhost:7003/api/keystone/me || true)
+            if [ "$status" = "401" ]; then echo "BFF is up"; exit 0; fi
+            sleep 5
+          done
+          echo "The BFF did not come up in time"; tail -n 100 apphost.log; exit 1
+
+      - name: End-to-end tests
+        working-directory: e2e
+        run: npm test
+
+      - name: Collect logs
+        if: failure()
+        run: |
+          mkdir -p logs
+          cp apphost.log socat.log logs/ 2>/dev/null || true
+          docker compose --project-directory zitadel -f zitadel/docker-compose.yml logs --no-color > logs/zitadel.log 2>&1 || true
+          for c in $(docker ps -a --format '{{.Names}}' | grep -E '^(sql|redis)-'); do docker logs "$c" > "logs/$c.log" 2>&1 || true; done
+
+      - name: Upload Playwright report and logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+            logs/
+          if-no-files-found: ignore

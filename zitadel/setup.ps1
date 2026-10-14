@@ -117,7 +117,7 @@ foreach ($user in $TestUsers) {
 }
 
 # --- Hand the client credentials to the AppHost (user secrets, never committed) ---
-$appHost = Join-Path $PSScriptRoot '..\Keystone.AppHost'
+$appHost = Join-Path $PSScriptRoot '..' 'Keystone.AppHost'
 dotnet user-secrets set 'Parameters:oidc-client-id' $clientId --project $appHost | Out-Null
 dotnet user-secrets set 'Parameters:oidc-client-secret' $clientSecret --project $appHost | Out-Null
 
