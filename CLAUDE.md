@@ -35,7 +35,7 @@ All work is on `main` (no remote configured). One commit per feature:
 
 * The actual Azure deployment (feature 7, second half). It needs an Azure subscription and a Zitadel Cloud instance; follow `docs/azure-deployment.md` from step 1.
 * Items in the hardening checklist at the end of `docs/azure-deployment.md` and the known gaps in `ARCHITECTURE.md` (for example: health probes only mapped in Development, `/connect/token` relies on network isolation only, signing key not in Key Vault).
-* Tests cover the BFF and Core API only (`tests/`, 139 unit tests, `dotnet test`). There are no tests yet for the Identity Service, the SPAs, or end to end against Zitadel (that was verified manually in the browser).
+* Tests cover the three .NET services (`tests/`, 193 unit tests, `dotnet test`). Not covered: the YARP request transform in `Keystone.Bff/Program.cs` (attaches the token, strips cookies), the Core API's JwtBearer configuration, the SPAs, and end to end against Zitadel (verified manually in the browser).
 
 ## Architecture in one paragraph
 
@@ -45,7 +45,7 @@ The **BFF** (`Keystone.Bff`, https://localhost:7003) is the only public entry po
 
 * **.NET 10, central package management.** Every NuGet version is pinned exactly in `Directory.Packages.props`; `.csproj` files have `PackageReference` without versions. Do not use floating versions (`9.*` once broke restore on partially published packages).
 * **Banned NuGet packages: Moq and AutoMapper.** Use hand-written fakes/stubs and explicit mapping code.
-* **Tests:** xUnit v3 in `tests/<Project>.Tests`, fakes in each project's `Fakes/` folder (`FakeRedis`, `TestIdentityProvider`, `TestDatabase` on SQLite in-memory, `BffTestHost`/`CoreApiTestHost` on `TestServer`). Tests must not need Docker or Zitadel. Logic in `Program.cs` is hard to test: put middleware and policies in extension methods (see `Middleware/CsrfProtection.cs`, `Authorization/KeystoneAuthorization.cs`) and test those. Every new feature and bug fix gets tests in the same commit.
+* **Tests:** xUnit v3 in `tests/<Project>.Tests`, fakes in each project's `Fakes/` folder (`FakeRedis`, `TestIdentityProvider`, `TestDatabase` on SQLite in-memory, `BffTestHost`/`CoreApiTestHost`/`IdentityServiceTestHost` on `TestServer`). Tests must not need Docker or Zitadel. Logic in `Program.cs` is hard to test: put middleware and policies in extension methods (see `Middleware/CsrfProtection.cs`, `Authorization/KeystoneAuthorization.cs`) and test those. Every new feature and bug fix gets tests in the same commit.
 * **Writing style in code comments and docs:** no em dashes.
 * **New API features** go in `Keystone.CoreApi/Endpoints`, are reached through the BFF prefixes, and are owner-scoped: the owner always comes from the token (`ICurrentUserService`), never from the request body.
 * **Mutating calls from the SPAs** must send `X-CSRF: 1` (the `api` helper in `src/lib/api.ts` does it). The BFF rejects unsafe methods without it.

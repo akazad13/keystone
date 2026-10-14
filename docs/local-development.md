@@ -93,11 +93,12 @@ Hot reload works: edits to the React apps show up immediately (Vite's HMR goes t
 dotnet test
 ```
 
-Two xUnit projects under `tests/`, both fully in memory (no Docker, Zitadel, SQL Server or Redis):
+Three xUnit projects under `tests/`, all fully in memory (no Docker, Zitadel, SQL Server or Redis):
 
 | Project | Covers | How it fakes the outside world |
 |---------|--------|--------------------------------|
 | `Keystone.Bff.Tests` | Session store, token refresh (incl. concurrent refresh), token exchange and its cache, logout token validation (every step of spec section 2.6), CSRF check, step-up check, login/logout/`me`, sessions and back-channel logout endpoints | `FakeRedis` (an in-memory `IDatabase` built with `DispatchProxy`), `TestIdentityProvider` (signing key, logout tokens, stub token endpoint), test authentication handlers on a `TestServer` |
+| `Keystone.IdentityService.Tests` | Signing key (dev fallback, required outside Development, PEM or base64 PEM, RFC 7638 `kid` identical across replicas, no private parts in JWKS), token issuing and validation, Zitadel userinfo and role mapping, `/connect/token` (every RFC 8693 error case), discovery, JWKS, introspection | Real key manager and token service; Zitadel replaced by a stub HTTP handler (`UserService`) or a fake `IUserService` on a `TestServer` |
 | `Keystone.CoreApi.Tests` | Project service (owner isolation, cache), just-in-time user provisioning (incl. the insert race), validators, project/admin/whoami endpoints with the real policies | SQLite in-memory (enforces the unique and foreign keys), `MemoryDistributedCache`, a header-based test authentication scheme on a `TestServer` |
 
 Mocking libraries are not used (Moq is banned in this organisation); fakes are small hand-written classes in each project's `Fakes` folder.

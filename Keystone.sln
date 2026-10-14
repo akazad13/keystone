@@ -19,6 +19,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Keystone.Bff.Tests", "tests
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Keystone.CoreApi.Tests", "tests\Keystone.CoreApi.Tests\Keystone.CoreApi.Tests.csproj", "{3963CC48-7D93-4AE0-B6DD-5864AFEB1BEE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Keystone.IdentityService.Tests", "tests\Keystone.IdentityService.Tests\Keystone.IdentityService.Tests.csproj", "{4D2EFA2C-4FB1-4B6C-80EB-E9D7D62BD3E1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -113,6 +115,18 @@ Global
 		{3963CC48-7D93-4AE0-B6DD-5864AFEB1BEE}.Release|x64.Build.0 = Release|Any CPU
 		{3963CC48-7D93-4AE0-B6DD-5864AFEB1BEE}.Release|x86.ActiveCfg = Release|Any CPU
 		{3963CC48-7D93-4AE0-B6DD-5864AFEB1BEE}.Release|x86.Build.0 = Release|Any CPU
+		{4D2EFA2C-4FB1-4B6C-80EB-E9D7D62BD3E1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4D2EFA2C-4FB1-4B6C-80EB-E9D7D62BD3E1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4D2EFA2C-4FB1-4B6C-80EB-E9D7D62BD3E1}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{4D2EFA2C-4FB1-4B6C-80EB-E9D7D62BD3E1}.Debug|x64.Build.0 = Debug|Any CPU
+		{4D2EFA2C-4FB1-4B6C-80EB-E9D7D62BD3E1}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{4D2EFA2C-4FB1-4B6C-80EB-E9D7D62BD3E1}.Debug|x86.Build.0 = Debug|Any CPU
+		{4D2EFA2C-4FB1-4B6C-80EB-E9D7D62BD3E1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4D2EFA2C-4FB1-4B6C-80EB-E9D7D62BD3E1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4D2EFA2C-4FB1-4B6C-80EB-E9D7D62BD3E1}.Release|x64.ActiveCfg = Release|Any CPU
+		{4D2EFA2C-4FB1-4B6C-80EB-E9D7D62BD3E1}.Release|x64.Build.0 = Release|Any CPU
+		{4D2EFA2C-4FB1-4B6C-80EB-E9D7D62BD3E1}.Release|x86.ActiveCfg = Release|Any CPU
+		{4D2EFA2C-4FB1-4B6C-80EB-E9D7D62BD3E1}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -120,5 +134,6 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{374FC077-CBD2-44AE-BA2D-81F6378CEE68} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{3963CC48-7D93-4AE0-B6DD-5864AFEB1BEE} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{4D2EFA2C-4FB1-4B6C-80EB-E9D7D62BD3E1} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

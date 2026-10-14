@@ -52,7 +52,7 @@ Keystone.CoreApi/            Business API (EF Core, SQL, Redis cache)
 keystone/                    Customer portal (React + Vite), served at /
 keystone-admin/              Admin dashboard (React + Vite), served at /admin/
 zitadel/                     Local Zitadel (official compose) and setup script
-tests/                       Unit tests for the BFF and Core API (xUnit, no Docker needed)
+tests/                       Unit tests for the three services (xUnit, no Docker needed)
 docs/                        Guides
 Directory.Packages.props     All NuGet package versions (central package management)
 ```
