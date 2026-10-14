@@ -1,3 +1,5 @@
+import { browser } from "@/lib/navigation";
+
 export const API_BASE = "/api/keystone-admin";
 
 /** Starts the OIDC login through the BFF and comes back to the current page. */
@@ -23,7 +25,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
     // No session (expired, logged out, or ended by a back-channel logout): sign in again.
     // /me is exempt so the app can show its own "sign in" screen.
     if (response.status === 401 && !response.url.endsWith(`${API_BASE}/me`)) {
-      window.location.href = loginUrl();
+      browser.navigate(loginUrl());
       throw new ApiError(401, "Unauthorized");
     }
     const body = await response.text();

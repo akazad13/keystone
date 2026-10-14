@@ -103,6 +103,20 @@ Three xUnit projects under `tests/`, all fully in memory (no Docker, Zitadel, SQ
 
 Mocking libraries are not used (Moq is banned in this organisation); fakes are small hand-written classes in each project's `Fakes` folder.
 
+The React apps have their own tests (Vitest, React Testing Library, jsdom):
+
+```powershell
+cd keystone; npm test         # or: npm run test:watch
+cd ..\keystone-admin; npm test
+```
+
+| App | Covers |
+|-----|--------|
+| `keystone/tests` | `api.ts` (CSRF header and cookie on every call, errors, step-up detection, login URLs), `useAuth` (401 means signed out; a session ended elsewhere is noticed), form schemas, header and sign-in prompt, and the Projects, Sessions and Who am I pages against a fake BFF |
+| `keystone-admin/tests` | `api.ts` (CSRF header, redirect to sign-in on 401 except for `/me`), the root layout (sign-in screen vs. app), the Users and Dashboard pages including the 403 "Admins only" screen |
+
+`tests/fakeBff.ts` replaces `fetch` with canned replies per `METHOD /path` and records every request, so tests assert what the BFF would have received. Pages are rendered with a real TanStack router and query client (`tests/render.tsx`). Full-page redirects go through `browser.navigate` (`src/lib/navigation.ts`) so tests can observe them; jsdom does not allow spying on `window.location`. `npm run build` type-checks the tests too.
+
 ### Add a database migration
 
 ```powershell
