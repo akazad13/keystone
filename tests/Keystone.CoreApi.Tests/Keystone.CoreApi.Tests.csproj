@@ -17,6 +17,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Keystone.CoreApi\Keystone.CoreApi.csproj" />
+    <!-- Contract tests: tokens from the real Identity Service must pass the Core API's validation. -->
+    <ProjectReference Include="..\..\Keystone.IdentityService\Keystone.IdentityService.csproj" />
   </ItemGroup>
 
   <ItemGroup>

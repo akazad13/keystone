@@ -21,27 +21,8 @@ builder.AddRedisClientBuilder("redis")
     .WithAzureAuthentication()
     .WithDistributedCache(options => options.InstanceName = "keystone:core-api:");
 
-// JWT Bearer authentication: validates Keystone access tokens issued by the Identity Service.
-// Validation is offline: the signing keys are fetched once from the Identity Service's JWKS and cached.
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        // The discovery document gives the expected issuer and the JWKS location.
-        options.MetadataAddress = "http://identity-service/.well-known/openid-configuration";
-        options.RequireHttpsMetadata = false; // internal network only
-
-        options.Audience = "core-api";
-        options.MapInboundClaims = false;
-        options.TokenValidationParameters.NameClaimType = "name";
-        options.TokenValidationParameters.RoleClaimType = "role";
-        options.TokenValidationParameters.ValidTypes = ["at+jwt"];
-    });
-
-// The metadata request must resolve "identity-service" through Aspire service discovery,
-// so it uses an HttpClient from the factory instead of the handler's own.
-builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
-    .Configure<IHttpClientFactory>((options, httpClientFactory) =>
-        options.Backchannel = httpClientFactory.CreateClient("identity-service"));
+// JWT Bearer authentication: validates Keystone access tokens issued by the Identity Service (offline, via its JWKS).
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddKeystoneJwtBearer();
 
 // Authorization policies "Admin" and "User"
 builder.Services.AddAuthorizationBuilder().AddKeystonePolicies();
