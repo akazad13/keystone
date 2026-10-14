@@ -35,7 +35,7 @@ All work is on `main` (no remote configured). One commit per feature:
 
 * The actual Azure deployment (feature 7, second half). It needs an Azure subscription and a Zitadel Cloud instance; follow `docs/azure-deployment.md` from step 1.
 * Items in the hardening checklist at the end of `docs/azure-deployment.md` and the known gaps in `ARCHITECTURE.md` (for example: health probes only mapped in Development, `/connect/token` relies on network isolation only, signing key not in Key Vault).
-* Tests cover the three .NET services (`tests/`, 222 tests, `dotnet test`), including the BFF proxy through real YARP with the real route table and the Core API's JWT validation against the real Identity Service, and both React apps (`keystone/tests` 53, `keystone-admin/tests` 20, `npm test`). Not covered: end to end against Zitadel in a real browser (verified manually), and the portal's static pages that call no API (`/`, `/dashboard`).
+* Tests cover the three .NET services (`tests/`, 222 tests, `dotnet test`), including the BFF proxy through real YARP with the real route table and the Core API's JWT validation against the real Identity Service, and both React apps (`keystone/tests` 53, `keystone-admin/tests` 20, `npm test`). End to end: `e2e/` (Playwright, 21 tests) drives Edge through Zitadel's login UI against the running stack, including RP-initiated and back-channel logout. Not covered anywhere: the portal's static pages that call no API (`/`, `/dashboard`); end to end only, not covered: the 5 minute step-up limit and token refresh (unit-tested).
 
 ## Architecture in one paragraph
 
@@ -47,6 +47,7 @@ The **BFF** (`Keystone.Bff`, https://localhost:7003) is the only public entry po
 * **Banned NuGet packages: Moq and AutoMapper.** Use hand-written fakes/stubs and explicit mapping code.
 * **Tests:** xUnit v3 in `tests/<Project>.Tests`, fakes in each project's `Fakes/` folder (`FakeRedis`, `TestIdentityProvider`, `TestDatabase` on SQLite in-memory, `BffTestHost`/`CoreApiTestHost`/`IdentityServiceTestHost`/`ProxyTestHost`/`JwtTestHost` on `TestServer`). Tests must not need Docker or Zitadel. Logic in `Program.cs` is hard to test: put middleware and policies in extension methods (see `Middleware/CsrfProtection.cs`, `Proxy/CoreApiTokenTransform.cs`, `Authorization/KeystoneAuthorization.cs`, `Authorization/KeystoneJwtBearer.cs`) and test those. Every new feature and bug fix gets tests in the same commit.
 * **Frontend tests:** Vitest + React Testing Library in `<app>/tests`, no MSW or other mocking library: `tests/fakeBff.ts` stubs `fetch`, `tests/render.tsx` renders with a real router and query client. Render route components via `Route.options.component`. Leave the SPA with `browser.navigate(url)` (`src/lib/navigation.ts`), never `window.location.href = ...` directly, so tests can see it. Test packages are pinned to versions that support the apps' Vite 6 (Vitest 3.2, jsdom 26).
+* **End-to-end tests:** Playwright (pinned exactly, 1.63.0) in `e2e/`, run serially against the real stack, Edge via `channel: "msedge"` (no browser download). The password and client id are read from `zitadel/setup.ps1` and the AppHost user secrets, never copied into the tests. Zitadel's login v2 UI: a "Loginname" page, then a password page; `prompt=login` starts over at the login name; `end_session` shows an account picker that must be clicked before the session (and the back-channel logout) ends. React Query re-checks on `visibilitychange` on `window`, so a synthetic event must bubble.
 * **Writing style in code comments and docs:** no em dashes.
 * **New API features** go in `Keystone.CoreApi/Endpoints`, are reached through the BFF prefixes, and are owner-scoped: the owner always comes from the token (`ICurrentUserService`), never from the request body.
 * **Mutating calls from the SPAs** must send `X-CSRF: 1` (the `api` helper in `src/lib/api.ts` does it). The BFF rejects unsafe methods without it.
@@ -78,6 +79,7 @@ cd zitadel; docker compose up -d --wait; pwsh ./setup.ps1; cd ..   # first time 
 dotnet run --project Keystone.AppHost                               # https://localhost:7003
 dotnet test                                                         # .NET tests, no Docker needed
 cd keystone; npm test; cd ..\keystone-admin; npm test; cd ..        # React app tests
+cd e2e; npm test; cd ..                                             # end to end, needs Zitadel + AppHost running
 pwsh ./scripts/preview-production.ps1                               # Production-mode BFF locally
 cd zitadel; docker compose down                                     # stop Zitadel (data kept)
 ```

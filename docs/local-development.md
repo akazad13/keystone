@@ -117,6 +117,8 @@ cd ..\keystone-admin; npm test
 
 `tests/fakeBff.ts` replaces `fetch` with canned replies per `METHOD /path` and records every request, so tests assert what the BFF would have received. Pages are rendered with a real TanStack router and query client (`tests/render.tsx`). Full-page redirects go through `browser.navigate` (`src/lib/navigation.ts`) so tests can observe them; jsdom does not allow spying on `window.location`. `npm run build` type-checks the tests too.
 
+With the stack running (Zitadel and the AppHost), the end-to-end tests drive a real browser through Zitadel's login UI: `cd e2e; npm install; npm test`. See [e2e/README.md](../e2e/README.md).
+
 ### Add a database migration
 
 ```powershell

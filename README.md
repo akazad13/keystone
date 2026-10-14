@@ -29,7 +29,7 @@ dotnet run --project Keystone.AppHost
 
 Open <https://localhost:7003> (portal) or <https://localhost:7003/admin/> (admin) and sign in as `alice` (Admin) or `bob` (User); the password is in `zitadel/setup.ps1`. The Aspire dashboard link is printed in the console.
 
-Run the tests with `dotnet test` from the repository root (.NET services) and `npm test` in `keystone/` and `keystone-admin/` (React apps). They need no Docker, Zitadel or database.
+Run the tests with `dotnet test` from the repository root (.NET services) and `npm test` in `keystone/` and `keystone-admin/` (React apps). They need no Docker, Zitadel or database. The end-to-end tests in [e2e/](e2e/README.md) drive a real browser against the running stack.
 
 ## Documentation
 
@@ -53,6 +53,7 @@ keystone/                    Customer portal (React + Vite), served at /; tests 
 keystone-admin/              Admin dashboard (React + Vite), served at /admin/; tests in keystone-admin/tests
 zitadel/                     Local Zitadel (official compose) and setup script
 tests/                       Unit tests for the three services (xUnit, no Docker needed)
+e2e/                         End-to-end tests (Playwright) against the running stack and Zitadel
 docs/                        Guides
 Directory.Packages.props     All NuGet package versions (central package management)
 ```
