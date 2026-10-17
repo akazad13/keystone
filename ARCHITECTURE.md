@@ -10,6 +10,7 @@ Related documents:
 | [docs/oidc-guide.md](docs/oidc-guide.md) | How login, logout and back-channel logout work, step by step, mapped to the code |
 | [docs/azure-deployment.md](docs/azure-deployment.md) | Deploying to Azure Container Apps with `aspire deploy` |
 | [docs/build-along.md](docs/build-along.md) | Features to build yourself to learn the architecture end to end |
+| [e2e/README.md](e2e/README.md) | End-to-end tests driving Microsoft Edge through Zitadel against the running stack |
 
 ---
 
@@ -17,7 +18,7 @@ Related documents:
 
 ```mermaid
 flowchart LR
-    subgraph Browser
+    subgraph Browser["Browser"]
         SPA1["keystone<br/>(customer portal)"]
         SPA2["keystone-admin<br/>(admin dashboard, /admin)"]
     end
@@ -37,7 +38,8 @@ flowchart LR
 
     SPA1 -- "cookie, same origin" --> BFF
     SPA2 -- "cookie, same origin" --> BFF
-    Browser -- "login pages" --> IDP
+    SPA1 -. "login redirect" .-> IDP
+    SPA2 -. "login redirect" .-> IDP
     BFF -- "OIDC: code, tokens, userinfo" --> IDP
     IDP -. "back-channel logout" .-> BFF
     BFF -- "RFC 8693 token exchange" --> IDS
@@ -63,12 +65,14 @@ Three rules shape everything:
 |---------|------|----------------|-----------|
 | `Keystone.AppHost` | Aspire orchestrator: declares every resource, its wiring and its Azure mapping | (dev tool) | `Program.cs` |
 | `Keystone.ServiceDefaults` | OpenTelemetry, health checks, HTTP resilience, service discovery for every .NET service | (library) | `Extensions.cs` |
-| `Keystone.Bff` | OIDC client (relying party), server-side sessions (listable and revocable), token refresh, CSRF defence, reverse proxy to the Core API, static frontends, back-channel logout receiver | **Internet** | `Program.cs`, `Endpoints/`, `Services/RedisTicketStore.cs`, `Services/SessionTokenService.cs`, `Services/TokenRefresher.cs`, `Services/LogoutTokenValidator.cs` |
-| `Keystone.IdentityService` | Exchanges an IdP access token for a Keystone access token; publishes its signing keys; the only code that knows Zitadel's claim formats | Private network | `Endpoints/AuthEndpoints.cs`, `Services/UserService.cs`, `Services/TokenService.cs`, `Services/KeyManager.cs` |
-| `Keystone.CoreApi` | Business API (projects). Validates Keystone JWTs offline; EF Core + SQL; Redis cache | Private network | `Program.cs`, `Endpoints/ProjectEndpoints.cs`, `Data/` |
-| `keystone` | Customer portal SPA (React, Vite, TanStack Router/Query) | Served by the BFF at `/` | `src/hooks/useAuth.ts`, `src/lib/api.ts` |
-| `keystone-admin` | Admin dashboard SPA | Served by the BFF at `/admin/` | same as above |
+| `Keystone.Bff` | OIDC client (relying party), server-side sessions (listable and revocable), token refresh, CSRF defence, reverse proxy to the Core API, static frontends, back-channel logout receiver | **Internet** | `Program.cs`, `Endpoints/`, `Proxy/CoreApiTokenTransform.cs`, `Middleware/CsrfProtection.cs`, `Middleware/RecentAuthentication.cs`, `Services/RedisTicketStore.cs`, `Services/SessionTokenService.cs`, `Services/TokenRefresher.cs`, `Services/LogoutTokenValidator.cs` |
+| `Keystone.IdentityService` | Exchanges an IdP access token for a Keystone access token; publishes discovery & JWKS; token introspection; the only code that knows Zitadel's claim formats | Private network | `Endpoints/AuthEndpoints.cs`, `Endpoints/WellKnownEndpoints.cs`, `Endpoints/InternalEndpoints.cs`, `Services/UserService.cs`, `Services/TokenService.cs`, `Services/KeyManager.cs` |
+| `Keystone.CoreApi` | Business API (projects, whoami, admin users & stats). Validates Keystone JWTs offline; JIT user provisioning; EF Core + SQL; Redis cache | Private network | `Program.cs`, `Endpoints/ProjectEndpoints.cs`, `Endpoints/AdminEndpoints.cs`, `Endpoints/WhoAmIEndpoints.cs`, `Authorization/KeystoneJwtBearer.cs`, `Authorization/KeystoneAuthorization.cs`, `Services/CurrentUserService.cs`, `Services/ProjectService.cs`, `Data/` |
+| `keystone` | Customer portal SPA (React, Vite, TanStack Router/Query) | Served by the BFF at `/` | `src/hooks/useAuth.ts`, `src/lib/api.ts`, `src/routes/` |
+| `keystone-admin` | Admin dashboard SPA | Served by the BFF at `/admin/` | `src/hooks/useAuth.ts`, `src/lib/api.ts`, `src/routes/` |
 | `zitadel/` | Local Zitadel (official compose file) and `setup.ps1`, which configures it for Keystone | Your machine only | `docker-compose.yml`, `.env`, `setup.ps1` |
+| `tests/` | Unit and integration test suites for the three .NET services (xUnit v3, hand-written fakes, no Docker/Moq needed) | (test suite) | `Keystone.Bff.Tests/`, `Keystone.CoreApi.Tests/`, `Keystone.IdentityService.Tests/` |
+| `e2e/` | End-to-end tests driving Microsoft Edge through Zitadel against the running stack (Playwright) | (test suite) | `e2e/tests/`, `e2e/support/`, `playwright.config.ts` |
 
 ---
 
@@ -78,7 +82,7 @@ Three rules shape everything:
 
 The BFF is a confidential OIDC client using the **authorization code flow with PKCE**. The full walkthrough, with every parameter explained, is in [docs/oidc-guide.md](docs/oidc-guide.md#3-login-authorization-code-flow-with-pkce).
 
-1. The SPA links to `GET /api/{app}/auth/login?returnUrl=...`.
+1. The SPA links to `GET /api/{app}/auth/login?returnUrl=...` (optional `prompt=login` for step-up re-authentication).
 2. The BFF redirects the browser to Zitadel's authorization endpoint.
 3. The user signs in at Zitadel. Zitadel redirects back to `/signin-oidc` with a one-time `code`.
 4. The BFF redeems the code (with its client secret and PKCE verifier), validates the ID token, calls userinfo, stores the session in Redis and sets the `__Host-keystone` cookie.
@@ -100,6 +104,11 @@ sequenceDiagram
     alt Keystone token cached for this session
         R-->>F: cached Keystone token
     else no cached token
+        opt Zitadel access token expired / expiring soon
+            F->>Z: POST /oauth/v2/token (refresh_token with Redis lock)
+            Z-->>F: new access_token + rotated refresh_token
+            F->>R: update session with rotated tokens
+        end
         F->>I: POST /connect/token (token exchange, subject_token = Zitadel access token)
         I->>Z: GET /oidc/v1/userinfo (Bearer Zitadel token)
         Z-->>I: sub, name, email, project roles
@@ -112,14 +121,17 @@ sequenceDiagram
     F-->>B: 200 JSON
 ```
 
-YARP rewrites `/api/keystone/**` and `/api/keystone-admin/**` to `/api/**` on the Core API. The Core API does not know which frontend called it.
+* **Header isolation:** In `Keystone.Bff/Proxy/CoreApiTokenTransform.cs`, YARP strips any incoming browser `Cookie` and `Authorization` headers, and attaches `Authorization: Bearer <Keystone JWT>`.
+* **Path rewriting:** YARP rewrites `/api/keystone/**` and `/api/keystone-admin/**` to `/api/**` on the Core API. The Core API does not know which frontend called it.
+* **Step-up authentication:** For `DELETE` operations, `RecentAuthentication` middleware verifies that the session's `auth_time` is within the last 5 minutes, returning RFC 9470 `401 Unauthorized` (`insufficient_user_authentication`) if older.
 
-### 3.3 Logout and back-channel logout
+### 3.3 Logout and session revocation
 
 * **RP-initiated logout** (`POST /api/{app}/auth/logout`): the BFF deletes its session, then sends the browser to Zitadel's `end_session_endpoint` with `id_token_hint`, so Zitadel ends its SSO session too.
 * **Back-channel logout** (`POST /bff/backchannel-logout`): when a Zitadel session ends for any reason, Zitadel calls the BFF server to server with a signed *logout token*. The BFF validates it and deletes every session created from that Zitadel session (`sid`), or every session of that user (`sub`).
+* **Session management** (`GET /api/{app}/sessions`, `POST /api/{app}/sessions/{id}/revoke`, `POST /api/{app}/sessions/revoke-all`): allows users to inspect and revoke active sessions across browsers.
 
-Both are described step by step in [docs/oidc-guide.md](docs/oidc-guide.md#6-logout).
+Both logout flows are described step by step in [docs/oidc-guide.md](docs/oidc-guide.md#6-logout).
 
 ---
 
@@ -134,8 +146,8 @@ Both are described step by step in [docs/oidc-guide.md](docs/oidc-guide.md#6-log
 | Held by | BFF, inside the encrypted session in Redis | BFF (cached per session); sent to the Core API |
 | Audience | the BFF's client id | `core-api` |
 | Lifetime | Zitadel's settings (access token 12 h by default) | 15 minutes (`Jwt:LifetimeMinutes`) |
-| Validated by | BFF (ID token), Zitadel (access token, via userinfo) | Core API, offline, using the Identity Service's JWKS |
-| Claims used | `sub`, `sid`, `name`, `email`, project roles | `sub`, `name`, `email`, `role` |
+| Validated by | BFF (ID token signature/claims against Zitadel JWKS); Identity Service (access token, via Zitadel's userinfo endpoint) | Core API, offline, using the Identity Service's JWKS |
+| Claims used | `sub`, `sid`, `name`, `email`, `preferred_username`, `auth_time`, project roles | `sub`, `name`, `email`, `preferred_username`, `role` |
 
 ### 4.2 Redis keys
 
@@ -144,15 +156,19 @@ Both are described step by step in [docs/oidc-guide.md](docs/oidc-guide.md#6-log
 | `keystone:bff:session:{id}` | BFF `RedisTicketStore` | The authentication ticket (claims + Zitadel tokens), encrypted with Data Protection | Session lifetime (8 h sliding) |
 | `keystone:bff:session:{id}:core-api-token` | BFF `SessionTokenService` | The cached Keystone token, encrypted | The shorter of its own and the Zitadel access token's lifetime, minus 1 minute |
 | `keystone:bff:session:{id}:refresh-lock` | BFF `TokenRefresher` | Lock so only one request refreshes a session's tokens at a time | 10 seconds (released after the refresh) |
-| `keystone:bff:session:sid:{sid}` | BFF | Set of session ids created from one Zitadel session | Session lifetime |
-| `keystone:bff:session:sub:{sub}` | BFF | Set of session ids of one user | Session lifetime |
+| `keystone:bff:session:sid:{sid}` | BFF `RedisTicketStore` | Set of session ids created from one Zitadel session | Session lifetime |
+| `keystone:bff:session:sub:{sub}` | BFF `RedisTicketStore` | Set of session ids of one user | Session lifetime |
 | `keystone:bff:logout-jti:{jti}` | BFF `LogoutTokenValidator` | Marker that a logout token was already processed (replay protection) | Token expiry + 5 minutes |
 | `keystone:bff:dataprotection-keys` | ASP.NET Core Data Protection | Keys that encrypt cookies and session payloads, shared by all BFF replicas | Managed by Data Protection |
 | `keystone:core-api:projects:owner:{userId}` | Core API `ProjectService` | One user's project list (one key per user, so lists are never shared) | 5 minutes |
 
 ### 4.3 SQL
 
-The Core API owns the `keystonedb` database (tables `Users`, `Projects`). A `Users` row is created the first time someone calls the API (just-in-time provisioning in `CurrentUserService`), keyed by the identity provider's `sub` (`ExternalId`), and refreshed from later tokens. Every project belongs to the user who created it; the owner is taken from the token, never from the request. The schema is managed with EF Core migrations in `Keystone.CoreApi/Data/Migrations`, applied at startup. EF Core takes a database lock while migrating, so several replicas starting together do not race.
+The Core API owns the `keystonedb` database (tables `Users`, `Projects`):
+
+* **`Users` table (`AppUser`):** Stores `Id`, `ExternalId` (`sub`), `Email`, `DisplayName`, `Role`, `CreatedAt`, `UpdatedAt`, and `LastSeenAt`. Provisioned just-in-time on the caller's first API call via `app.UseUserProvisioning()` and `CurrentUserService`, and refreshed on subsequent requests.
+* **`Projects` table (`Project`):** Stores `Id`, `Name`, `Description`, `Status`, `DueDate`, `OwnerId`, `CreatedAt`, and `UpdatedAt`. Every project belongs to the user who created it; the owner is taken from the token, never from the request.
+* **Migrations:** Managed with EF Core migrations in `Keystone.CoreApi/Data/Migrations`, applied at startup. EF Core takes a database lock while migrating, so several replicas starting together do not race.
 
 ---
 
@@ -167,7 +183,7 @@ Everything that differs between environments is an Aspire **parameter** declared
 | `oidc-client-secret` (secret) | BFF | From `setup.ps1` | From the Zitadel Cloud app |
 | `identity-signing-key` (secret, deploy only) | Identity Service | Not needed: a temporary key is generated at startup | RSA private key (PEM, base64-encoded) |
 
-Connection strings for SQL and Redis, and the addresses of the services (`http://identity-service`, `http://core-api`), are injected by Aspire. Nothing is hard-coded per environment.
+Connection strings for SQL and Redis, and the addresses of the services (`http://identity-service`, `http://core-api`), are injected by Aspire. Nothing is hard-coded per environment. For local production preview testing, `Keystone:PreviewWebRoot` points the BFF at pre-built frontend bundles.
 
 ---
 
@@ -175,13 +191,16 @@ Connection strings for SQL and Redis, and the addresses of the services (`http:/
 
 ```mermaid
 flowchart TB
-    U["Users"] -->|HTTPS| BFF
+    U["Users"]
+
     subgraph ENV["Azure Container Apps environment (keystone-env)"]
         BFF["bff<br/>external ingress<br/>serves both SPAs"]
         IDS["identity-service<br/>internal"]
         API["core-api<br/>internal"]
         DASH["Aspire dashboard"]
     end
+
+    U -->|HTTPS| BFF
     BFF --> IDS
     BFF --> API
     API --> IDS
@@ -191,8 +210,10 @@ flowchart TB
     BFF --> ZC["Zitadel Cloud"]
     IDS --> ZC
     ZC -. "back-channel logout" .-> BFF
-    ACR["Azure Container Registry"] -.-> ENV
-    ENV -.-> LAW["Log Analytics"]
+    ACR["Azure Container Registry"] -. "pull images" .-> BFF
+    BFF -. "logs / traces" .-> LAW["Log Analytics"]
+    API -. "logs / traces" .-> LAW
+    IDS -. "logs / traces" .-> LAW
 ```
 
 | Azure resource | Comes from | Purpose |
@@ -237,22 +258,23 @@ Aspire 9 is out of support. Aspire 13 generates the Bicep, builds the images and
 | Threat | Defence | Where |
 |--------|---------|-------|
 | Token theft through XSS | No tokens in the browser; HttpOnly session cookie | BFF |
-| Session fixation / cookie tampering | `__Host-` cookie, Secure, server-side session ids, Data Protection | BFF `Program.cs` |
-| CSRF on the API | Unsafe methods require `X-CSRF: 1` (a cross-site page cannot add it without a CORS preflight); `SameSite=Lax` | BFF `Program.cs` |
-| Authorization code interception | PKCE (S256) + confidential client secret | BFF OIDC options |
+| Session fixation / cookie tampering | `__Host-` cookie, Secure, server-side session ids, Data Protection | BFF `Program.cs`, `Services/RedisTicketStore.cs` |
+| CSRF on the API | Unsafe methods require `X-CSRF: 1` (a cross-site page cannot add it without a CORS preflight); `SameSite=Lax` | BFF `Middleware/CsrfProtection.cs` |
+| Authorization code interception | PKCE (S256) + confidential client secret | BFF OIDC options (`Program.cs`) |
 | Login CSRF / replayed ID tokens | `state` (correlation cookie) and `nonce` | ASP.NET Core OIDC handler |
-| Open redirect after login | `returnUrl` must be a local path | `HttpContextExtensions.IsLocalUrl` |
-| Forged or replayed logout tokens | Signature, issuer, audience, lifetime, `events`, no `nonce`, `jti` replay cache | `LogoutTokenValidator` |
-| Stolen internal token | 15-minute lifetime, audience-bound (`core-api`), never leaves the server side | Identity Service |
-| Unattended session used for destructive actions | Step-up (RFC 9470): DELETE needs `auth_time` within 5 minutes, otherwise `insufficient_user_authentication` and a `prompt=login` round trip | BFF `Middleware/RecentAuthentication.cs` |
-| Abuse | Per-user fixed-window rate limit on the proxied API | BFF |
+| Open redirect after login | `returnUrl` must be a local path | `Endpoints/AuthEndpoints.cs`, `Extensions/HttpContextExtensions.IsLocalUrl` |
+| Forged or replayed logout tokens | Signature, issuer, audience, lifetime, `events`, no `nonce`, `jti` replay cache | BFF `Services/LogoutTokenValidator.cs` |
+| Stolen internal token | 15-minute lifetime, audience-bound (`core-api`), offline signature verification | Identity Service (`Services/TokenService.cs`), Core API (`Authorization/KeystoneJwtBearer.cs`) |
+| Token refresh races & expiry | Refresh token rotation with Redis lock (`...:refresh-lock`), clean 401 on `invalid_grant` | BFF `Services/TokenRefresher.cs` |
+| Unattended session used for destructive actions | Step-up (RFC 9470): DELETE needs `auth_time` within 5 minutes, otherwise `insufficient_user_authentication` challenge and a `prompt=login` round trip | BFF `Middleware/RecentAuthentication.cs`, `keystone/src/lib/api.ts` |
+| Abuse | Per-user fixed-window rate limit on the proxied API | BFF `Program.cs` |
 | Secrets in config | Managed identities for SQL/Redis; client secret and signing key as Container App secrets | AppHost |
 
-Known gaps, good next steps (several are build-along exercises):
+Hardening checklist beyond this learning project (see [docs/azure-deployment.md](docs/azure-deployment.md#hardening-checklist)):
 
-* The Identity Service's `/connect/token` relies on network isolation; it does not authenticate its caller.
-* The signing key is not rotated; the JWKS only ever contains one key.
-* Health endpoints are only mapped in Development; Container Apps health probes are not configured.
+* The Identity Service's `/connect/token` relies on network isolation; in high-security environments, authenticate its caller with mTLS or client credentials.
+* The signing key is currently not rotated automatically; production systems can store keys in Key Vault and publish multiple active keys during rotation.
+* Health endpoints (`/health`, `/alive`) are mapped only in Development; configure Container Apps health probes for production.
 
 ---
 
@@ -265,6 +287,7 @@ Known gaps, good next steps (several are build-along exercises):
 | Reverse proxy | YARP 2.3 with Aspire service discovery |
 | Identity provider | Zitadel v4 (local Docker Compose; Zitadel Cloud in Azure) |
 | Data | EF Core 10 on SQL Server / Azure SQL; Redis / Azure Managed Redis |
-| Frontends | React 19, TypeScript 5.9, Vite 6, TanStack Router and Query, Tailwind CSS 4 |
+| Frontends | React 19, TypeScript 5.7 (e2e: 5.9), Vite 6, TanStack Router and Query, Tailwind CSS 4 |
 | Observability | OpenTelemetry to the Aspire dashboard (locally and in Azure) and Log Analytics |
+| Testing | xUnit v3 (services, hand-written fakes; no mocking libraries), Vitest 3.2 + RTL (frontends), Playwright 1.63 (E2E with real browser & Zitadel) |
 | Package management | Central package management (`Directory.Packages.props`), exact versions |
