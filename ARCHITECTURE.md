@@ -117,7 +117,7 @@ sequenceDiagram
         F->>R: cache it until shortly before expiry
     end
     F->>A: GET /api/projects (Authorization: Bearer Keystone JWT)
-    A->>A: validate signature (cached JWKS), iss, aud, exp, typ; check roles
+    A->>A: validate signature (cached JWKS), iss, aud, exp, typ, and check roles
     A-->>F: 200 JSON
     F-->>B: 200 JSON
 ```
