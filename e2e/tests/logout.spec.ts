@@ -63,10 +63,21 @@ test.describe("Back-channel logout", () => {
     await signOutAtZitadel(zitadelTab, users.alice);
     await zitadelTab.close();
 
-    // Switching back to a tab fires visibilitychange (it bubbles from document to window, where React
-    // Query listens); useAuth then re-checks /me. Headless tabs never become hidden, so fire it here.
+    // Switching back to a tab fires visibilitychange (where React Query listens); useAuth then
+    // re-checks /me. Headless tabs never become hidden, so fire it here. The back-channel logout call
+    // from Zitadel is asynchronous, so poll until the tab receives 401 and updates the view.
     await page.bringToFront();
-    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange", { bubbles: true })));
-    await expect(page.getByText("Sign in to see your projects.")).toBeVisible();
+    await expect
+      .poll(
+        async () => {
+          await page.evaluate(() => {
+            window.dispatchEvent(new Event("focus"));
+            document.dispatchEvent(new Event("visibilitychange", { bubbles: true }));
+          });
+          return page.getByText("Sign in to see your projects.").isVisible();
+        },
+        { timeout: 15_000 }
+      )
+      .toBe(true);
   });
 });
