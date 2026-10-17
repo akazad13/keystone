@@ -68,25 +68,40 @@ export async function callApi(
   path: string,
   { body, csrf = true }: { body?: unknown; csrf?: boolean } = {}
 ): Promise<{ status: number; body: unknown }> {
-  return page.evaluate(
-    async ({ method, path, body, csrf }) => {
-      const response = await fetch(path, {
-        method,
-        credentials: "include",
-        headers: { "Content-Type": "application/json", ...(csrf ? { "X-CSRF": "1" } : {}) },
-        body: body === undefined ? undefined : JSON.stringify(body),
-      });
-      const text = await response.text();
-      let parsed: unknown = text;
-      try {
-        parsed = text ? JSON.parse(text) : null;
-      } catch {
-        // not JSON
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await page.evaluate(
+        async ({ method, path, body, csrf }) => {
+          const response = await fetch(path, {
+            method,
+            credentials: "include",
+            headers: { "Content-Type": "application/json", ...(csrf ? { "X-CSRF": "1" } : {}) },
+            body: body === undefined ? undefined : JSON.stringify(body),
+          });
+          const text = await response.text();
+          let parsed: unknown = text;
+          try {
+            parsed = text ? JSON.parse(text) : null;
+          } catch {
+            // not JSON
+          }
+          return { status: response.status, body: parsed };
+        },
+        { method, path, body, csrf }
+      );
+    } catch (error) {
+      if (
+        attempt < 2 &&
+        error instanceof Error &&
+        (error.message.includes("Failed to fetch") || error.message.includes("Execution context was destroyed"))
+      ) {
+        await page.waitForTimeout(500);
+        continue;
       }
-      return { status: response.status, body: parsed };
-    },
-    { method, path, body, csrf }
-  );
+      throw error;
+    }
+  }
+  throw new Error(`callApi ${method} ${path} failed after retries`);
 }
 
 /** Whether this browser currently has a Keystone session (the BFF's /me). */

@@ -50,6 +50,7 @@ async function warmUp() {
     page.setDefaultTimeout(120_000);
 
     await signIn(page, users.alice, "/projects");
+    await page.getByRole("heading", { name: "My projects" }).waitFor();
     const projects = await callApi(page, "GET", "/api/keystone/projects");
     if (projects.status !== 200) throw new Error(`Warm-up: GET /api/keystone/projects answered ${projects.status}.`);
 
