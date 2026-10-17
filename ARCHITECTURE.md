@@ -36,16 +36,16 @@ flowchart LR
 
     IDP["Zitadel<br/>(OpenID Provider)"]
 
-    SPA1 -- "cookie, same origin" --> BFF
-    SPA2 -- "cookie, same origin" --> BFF
-    SPA1 -. "login redirect" .-> IDP
-    SPA2 -. "login redirect" .-> IDP
-    BFF -- "OIDC: code, tokens, userinfo" --> IDP
-    IDP -. "back-channel logout" .-> BFF
-    BFF -- "RFC 8693 token exchange" --> IDS
-    IDS -- "userinfo (validates the IdP token)" --> IDP
-    BFF -- "Keystone JWT" --> API
-    API -- "JWKS (cached)" --> IDS
+    SPA1 -->|cookie, same origin| BFF
+    SPA2 -->|cookie, same origin| BFF
+    SPA1 -.->|login redirect| IDP
+    SPA2 -.->|login redirect| IDP
+    BFF -->|"OIDC: code, tokens, userinfo"| IDP
+    IDP -.->|back-channel logout| BFF
+    BFF -->|RFC 8693 token exchange| IDS
+    IDS -->|"userinfo (validates the IdP token)"| IDP
+    BFF -->|Keystone JWT| API
+    API -->|"JWKS (cached)"| IDS
     API --> SQL
     API --> REDIS
     BFF --> REDIS
@@ -72,7 +72,7 @@ Three rules shape everything:
 | `keystone-admin` | Admin dashboard SPA | Served by the BFF at `/admin/` | `src/hooks/useAuth.ts`, `src/lib/api.ts`, `src/routes/` |
 | `zitadel/` | Local Zitadel (official compose file) and `setup.ps1`, which configures it for Keystone | Your machine only | `docker-compose.yml`, `.env`, `setup.ps1` |
 | `tests/` | Unit and integration test suites for the three .NET services (xUnit v3, hand-written fakes, no Docker/Moq needed) | (test suite) | `Keystone.Bff.Tests/`, `Keystone.CoreApi.Tests/`, `Keystone.IdentityService.Tests/` |
-| `e2e/` | End-to-end tests driving Microsoft Edge through Zitadel against the running stack (Playwright) | (test suite) | `e2e/tests/`, `e2e/support/`, `playwright.config.ts` |
+| `e2e/` | End-to-end tests driving Microsoft Edge through Zitadel against the running stack (Playwright) | (test suite) | `tests/`, `support/`, `playwright.config.ts` |
 
 ---
 
@@ -86,6 +86,7 @@ The BFF is a confidential OIDC client using the **authorization code flow with P
 2. The BFF redirects the browser to Zitadel's authorization endpoint.
 3. The user signs in at Zitadel. Zitadel redirects back to `/signin-oidc` with a one-time `code`.
 4. The BFF redeems the code (with its client secret and PKCE verifier), validates the ID token, calls userinfo, stores the session in Redis and sets the `__Host-keystone` cookie.
+5. The BFF redirects the browser back to `returnUrl` (or the application root).
 
 ### 3.2 An API call
 
@@ -160,7 +161,7 @@ Both logout flows are described step by step in [docs/oidc-guide.md](docs/oidc-g
 | `keystone:bff:session:sub:{sub}` | BFF `RedisTicketStore` | Set of session ids of one user | Session lifetime |
 | `keystone:bff:logout-jti:{jti}` | BFF `LogoutTokenValidator` | Marker that a logout token was already processed (replay protection) | Token expiry + 5 minutes |
 | `keystone:bff:dataprotection-keys` | ASP.NET Core Data Protection | Keys that encrypt cookies and session payloads, shared by all BFF replicas | Managed by Data Protection |
-| `keystone:core-api:projects:owner:{userId}` | Core API `ProjectService` | One user's project list (one key per user, so lists are never shared) | 5 minutes |
+| `keystone:core-api:projects:owner:{ownerId}` | Core API `ProjectService` | One user's project list (one key per user, so lists are never shared) | 5 minutes |
 
 ### 4.3 SQL
 
@@ -209,11 +210,16 @@ flowchart TB
     BFF -->|managed identity| REDIS
     BFF --> ZC["Zitadel Cloud"]
     IDS --> ZC
-    ZC -. "back-channel logout" .-> BFF
-    ACR["Azure Container Registry"] -. "pull images" .-> BFF
-    BFF -. "logs / traces" .-> LAW["Log Analytics"]
-    API -. "logs / traces" .-> LAW
-    IDS -. "logs / traces" .-> LAW
+    ZC -.->|back-channel logout| BFF
+    ACR["Azure Container Registry"] -.->|pull images| BFF
+    ACR -.->|pull images| IDS
+    ACR -.->|pull images| API
+    BFF -.->|logs / traces| LAW["Log Analytics"]
+    API -.->|logs / traces| LAW
+    IDS -.->|logs / traces| LAW
+    BFF -.->|telemetry| DASH
+    API -.->|telemetry| DASH
+    IDS -.->|telemetry| DASH
 ```
 
 | Azure resource | Comes from | Purpose |
@@ -270,7 +276,7 @@ Aspire 9 is out of support. Aspire 13 generates the Bicep, builds the images and
 | Abuse | Per-user fixed-window rate limit on the proxied API | BFF `Program.cs` |
 | Secrets in config | Managed identities for SQL/Redis; client secret and signing key as Container App secrets | AppHost |
 
-Hardening checklist beyond this learning project (see [docs/azure-deployment.md](docs/azure-deployment.md#hardening-checklist)):
+Hardening checklist beyond this learning project (see [docs/azure-deployment.md](docs/azure-deployment.md#hardening-checklist-beyond-this-learning-project)):
 
 * The Identity Service's `/connect/token` relies on network isolation; in high-security environments, authenticate its caller with mTLS or client credentials.
 * The signing key is currently not rotated automatically; production systems can store keys in Key Vault and publish multiple active keys during rotation.
