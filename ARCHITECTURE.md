@@ -10,6 +10,7 @@ Related documents:
 | [docs/oidc-guide.md](docs/oidc-guide.md) | How login, logout and back-channel logout work, step by step, mapped to the code |
 | [docs/azure-deployment.md](docs/azure-deployment.md) | Deploying to Azure Container Apps with `aspire deploy` |
 | [docs/build-along.md](docs/build-along.md) | Features to build yourself to learn the architecture end to end |
+| [docs/adr/](docs/adr/) | Architecture Decision Records (ADRs 0001-0009) |
 | [e2e/README.md](e2e/README.md) | End-to-end tests driving Microsoft Edge through Zitadel against the running stack |
 
 ---
@@ -237,25 +238,27 @@ The frontends are not separate Azure resources. `PublishWithContainerFiles` buil
 
 ## 7. Key decisions
 
-Each decision lists the alternative that was rejected, so you can revisit it consciously.
+Each decision lists the alternative that was rejected, with full rationale recorded in [docs/adr/](docs/adr/).
 
-**D1. The BFF is the single origin for the SPAs, the API and the login callback.**
+**D1. The BFF is the single origin for the SPAs, the API and the login callback.** ([ADR 0002](docs/adr/0002-single-origin-bff-for-spas-and-apis.md))
 Rejected: Static Web Apps for the frontends with the BFF on another domain. That makes the session cookie cross-site (`SameSite=None`), which browsers increasingly block, and it needs CORS. Serving the SPAs from the BFF also means one deployable unit.
 
-**D2. The BFF speaks OpenID Connect directly to Zitadel.**
+**D2. The BFF speaks OpenID Connect directly to Zitadel.** ([ADR 0003](docs/adr/0003-direct-oidc-between-bff-and-idp.md))
 Rejected: the Identity Service proxying the login flow. A standards-compliant OIDC provider is a large piece of software; writing one by hand is error-prone and hides how OIDC really works. The BFF uses only standard OIDC (discovery, code flow, PKCE, end-session, back-channel logout), so any compliant provider can replace Zitadel.
 
-**D3. The Identity Service exchanges tokens instead of issuing them from scratch.**
+**D3. The Identity Service exchanges tokens instead of issuing them from scratch.** ([ADR 0004](docs/adr/0004-rfc-8693-token-exchange-for-internal-services.md))
 It keeps the original promise of the design: internal services never see the IdP's tokens, and IdP-specific claim formats (Zitadel's project roles) are translated in one place. Using RFC 8693 token exchange keeps the contract standard.
 
-**D4. Server-side sessions in Redis.**
+**D4. Server-side sessions in Redis.** ([ADR 0005](docs/adr/0005-server-side-encrypted-sessions-in-redis.md))
 Rejected: tokens in the encrypted cookie (the ASP.NET Core default). Cookies would grow to several kilobytes, could not be revoked server side, and back-channel logout would have nothing to delete.
 
-**D5. The identity provider is external in every environment.**
+**D5. The identity provider is external in every environment.** ([ADR 0006](docs/adr/0006-external-identity-provider-across-environments.md))
 Locally a Zitadel container stack; in Azure, Zitadel Cloud. Rejected: running Zitadel inside the Container Apps environment (it needs PostgreSQL, a login UI container and careful upgrades; operating an IdP is not what this project is about).
 
-**D6. Aspire 13 with `aspire deploy`.**
+**D6. Aspire 13 with `aspire deploy`.** ([ADR 0007](docs/adr/0007-aspire-13-cloud-native-orchestration-and-deployment.md))
 Aspire 9 is out of support. Aspire 13 generates the Bicep, builds the images and deploys them; it also supports passwordless SQL and Redis through managed identities out of the box.
+
+For step-up authentication and back-channel logout decisions, see [ADR 0008](docs/adr/0008-step-up-authentication-for-destructive-operations.md) and [ADR 0009](docs/adr/0009-back-channel-logout-and-cross-session-revocation.md).
 
 ---
 
