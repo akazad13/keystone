@@ -19,7 +19,7 @@ A learning project for understanding a secure .NET + Azure web platform end to e
 
 ## Current state (2026-10-14)
 
-All work is on `main` (no remote configured). One commit per feature:
+All work is on `main` (tracked on GitHub at https://github.com/akazad13/keystone). One commit per feature:
 
 | Commit | Feature | Status |
 |--------|---------|--------|
