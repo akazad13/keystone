@@ -56,10 +56,38 @@ dotnet test e2e/
 
 ---
 
-## 4. Verification Gates for AI Agents
+## 4. Testing Paradigm & Agentic Verification (ADR-0011)
+
+Keystone enforces a strict Test-Driven Development (TDD) paradigm optimized for autonomous agent velocity and zero mock fragility (see [ADR-0011](docs/adr/0011-testing-paradigm-and-agentic-verification.md) and [docs/testing.md](docs/testing.md)):
+
+1. **Test Pyramid**:
+   - **Tier 1 (Unit & Cryptographic)**: In-memory, sub-second execution. Tests offline token validators (`LogoutTokenValidatorTests`), DPAPI session cryptors (`RedisTicketStoreTests`), request validators, and frontend React components via Vitest + RTL.
+   - **Tier 2 (Integration & Proxy)**: ASP.NET Core `TestServer` hosting the real YARP forwarder pipeline (`ProxyTestHost` with `bff.appsettings.json`), stateful in-memory Redis (`FakeRedis`), containerized dependencies (Testcontainers Redis & Zitadel), and SQLite in-memory with foreign keys enabled.
+   - **Tier 3 (End-to-End)**: Playwright tests (`e2e/`) driving real browser sessions against the orchestrated Aspire AppHost and Zitadel container.
+
+2. **Core Testing Invariants**:
+   - **State Over Interaction**: `Moq`, `NSubstitute`, and mock frameworks are strictly banned. Assert observable state (HTTP responses, database rows, encrypted Redis payload state) rather than method call sequences (`Verify()`).
+   - **DAMP Over DRY**: Test methods should read like specifications. Prefer Descriptive And Meaningful Phrases (DAMP) over complex shared helper abstractions.
+   - **Isolated Keyspaces**: All Redis test keys and test contexts must use isolated prefixes/keyspaces (`keystone:bff:...`) to allow parallel execution without cross-test interference.
+
+3. **Fast Agentic Feedback Loop**:
+   - **Inner Loop (Targeted Test Execution)**: When developing or fixing bugs, run focused tests in milliseconds:
+     ```bash
+     # Run a single test class or method
+     dotnet test tests/Keystone.Bff.Tests --filter "FullyQualifiedName~RedisTicketStore"
+     npm test --prefix keystone -- -t "AuthStatus"
+     ```
+   - **Outer Loop (Verification Gate)**: Before completing your turn, execute the repository verification gate:
+     ```powershell
+     pwsh ./scripts/verify.ps1
+     ```
+
+---
+
+## 5. Verification Gates for AI Agents
 
 Before submitting code changes or finishing a turn:
 1. Run `pwsh ./scripts/verify.ps1` to verify all quality floor constraints, Release builds, and all 295 unit & integration tests.
 2. Confirm `dotnet test Keystone.sln` passes all 222 backend tests.
 3. If modifying frontend apps, confirm `npm test` passes all tests.
-4. Keep `CLAUDE.md`, `ARCHITECTURE.md`, and `docs/testing.md` updated if conventions change.
+4. Keep `CLAUDE.md`, `ARCHITECTURE.md`, `docs/adr/`, and `docs/testing.md` updated if conventions change.

@@ -149,12 +149,34 @@ dotnet run --project Keystone.AppHost
 
 ## 🧪 Testing
 
-| Test Suite | Scope | Command |
-| :--- | :--- | :--- |
-| **.NET Services** | Unit and integration tests for BFF, Identity Service, Core API | `dotnet test` |
-| **Customer Portal** | Component, hook, API client, and routing tests | `npm --prefix keystone test` |
-| **Admin Dashboard** | Admin component and API integration tests | `npm --prefix keystone-admin test` |
-| **End-to-End** | Full browser flows through Zitadel login and back-channel logout | `npm --prefix e2e test` |
+Keystone enforces a strict, zero-mock testing paradigm and multi-tiered testing pyramid codified in [ADR-0011](docs/adr/0011-testing-paradigm-and-agentic-verification.md) and [docs/testing.md](docs/testing.md).
+
+### Test Pyramid & Scope
+
+```
+          ╱  ╲         Tier 3: E2E Tests (~5%)
+         ╱    ╲        Playwright + Live Aspire Stack + Zitadel OIDC
+        ╱──────╲
+       ╱        ╲      Tier 2: Integration Tests (~15%)
+      ╱          ╲     TestServer + Real YARP Proxy + Redis & SQLite Fakes/Containers
+     ╱────────────╲
+    ╱              ╲   Tier 1: Unit & Component Tests (~80%)
+   ╱                ╲  In-memory token validators, session cryptors, React RTL
+  ╱──────────────────╲
+```
+
+| Tier | Scope | Frameworks | Speed | Command |
+| :--- | :--- | :--- | :--- | :--- |
+| **Tier 1: Unit** | Token validators, session cryptors, request validation, React components | xUnit v3, MTP, Vitest 3.2, React Testing Library | Milliseconds | `dotnet test --filter "FullyQualifiedName~RedisTicketStore"`<br/>`npm --prefix keystone test` |
+| **Tier 2: Integration** | YARP reverse proxy transforms, rate limiters, Redis state, SQLite relational schemas | ASP.NET Core `TestServer`, SQLite memory, `FakeRedis` / Testcontainers | 2–4s | `dotnet test Keystone.sln` |
+| **Tier 3: E2E** | Full user journeys: OIDC code flow + PKCE, session cookies, step-up auth, back-channel logout | Playwright 1.63, Chromium, Aspire AppHost + Zitadel | Minutes | `dotnet test e2e/` |
+
+### Architectural Testing Invariants
+
+- **State Over Interaction**: Mocking frameworks (`Moq`, `NSubstitute`) are **banned**. Tests assert on observable state (HTTP responses, database rows, encrypted Redis payload state) rather than method invocations.
+- **DAMP Over DRY**: Tests prioritize Descriptive And Meaningful Phrases (DAMP) so each test functions as a readable specification.
+- **Isolated Redis Keyspaces**: In-memory and container test runs use isolated keyspaces (`keystone:bff:...`) to enable parallel test execution without state collision.
+- **Verification Gate**: Autonomous agents and developers verify all quality floors and test suites via `pwsh ./scripts/verify.ps1`.
 
 ---
 
