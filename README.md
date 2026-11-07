@@ -163,7 +163,8 @@ dotnet run --project Keystone.AppHost
 | Guide | Description |
 | :--- | :--- |
 | 🏛️ [ARCHITECTURE.md](ARCHITECTURE.md) | Component architecture, token boundaries, Redis key design, and decision log |
-| 📝 [docs/adr/](docs/adr/) | Architecture Decision Records (ADRs 0001-0009) covering D1-D6, step-up auth, and logout |
+| 🧪 [docs/testing.md](docs/testing.md) | In-depth guide to the zero-mock testing paradigm, MTP, and three test tiers |
+| 📝 [docs/adr/](docs/adr/) | Architecture Decision Records (ADRs 0001-0011) covering D1-D6, step-up auth, package modernization, and testing |
 | 🔐 [docs/oidc-guide.md](docs/oidc-guide.md) | Step-by-step walkthrough of login, PKCE, token refresh, and back-channel logout |
 | 💻 [docs/local-development.md](docs/local-development.md) | Running, debugging, and inspecting services and traces locally |
 | ☁️ [docs/azure-deployment.md](docs/azure-deployment.md) | Azure Container Apps deployment with `aspire deploy` and Zitadel Cloud |

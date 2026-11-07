@@ -15,6 +15,7 @@ A learning project for understanding a secure .NET + Azure web platform end to e
 | [docs/local-development.md](docs/local-development.md) | Running, debugging, inspecting Redis and tokens, troubleshooting |
 | [docs/oidc-guide.md](docs/oidc-guide.md) | Every OIDC flow traced through the code |
 | [docs/azure-deployment.md](docs/azure-deployment.md) | Production preview and `aspire deploy` with Zitadel Cloud |
+| [docs/testing.md](docs/testing.md) | Zero-mock testing paradigm, MTP on .NET 10, and three-tier test architecture |
 | [docs/build-along.md](docs/build-along.md) | The feature exercises 1 to 7 |
 
 ## Current state (2026-10-14)

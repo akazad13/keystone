@@ -14,6 +14,7 @@ This directory documents the architectural decision records for Keystone. Each A
 | **[0008](0008-step-up-authentication-for-destructive-operations.md)** | Step-up authentication for destructive operations | Accepted | 2026-10-17 | RFC 9470, Step-Up Auth |
 | **[0009](0009-back-channel-logout-and-cross-session-revocation.md)** | Back-channel logout and cross-session revocation | Accepted | 2026-10-17 | OIDC Back-Channel Logout |
 | **[0010](0010-package-modernization.md)** | Solution package modernization and dependency alignment | Accepted | 2026-11-07 | Dependency Modernization |
+| **[0011](0011-zero-mock-testing-paradigm.md)** | Zero-mock testing paradigm and Microsoft.Testing.Platform | Accepted | 2026-11-07 | Quality Engineering, MTP Runner |
 
 ---
 
