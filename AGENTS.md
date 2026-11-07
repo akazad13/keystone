@@ -1,6 +1,8 @@
-# AGENTS.md — AI Agent Guidance & Repository Rules
+# AGENTS.md: AI Agent Guidance & Repository Rules
 
 This document provides mandatory guidance for autonomous AI coding agents (Antigravity, Claude Code, GitHub Copilot, Cursor, Windsurf, Devin) operating in `akazad13/keystone`.
+
+> **Read [CONSTRAINTS.md](CONSTRAINTS.md) before writing code. Do not weaken it to make a change pass.**
 
 ---
 
@@ -57,6 +59,7 @@ dotnet test e2e/
 ## 4. Verification Gates for AI Agents
 
 Before submitting code changes or finishing a turn:
-1. Run `dotnet test Keystone.sln` — all 222 backend tests must pass.
-2. If modifying frontend apps, run `npm test` inside the respective frontend directory.
-3. Keep `CLAUDE.md` and `ARCHITECTURE.md` updated if conventions change.
+1. Run `pwsh ./scripts/verify.ps1` to verify all quality floor constraints, Release builds, and all 295 unit & integration tests.
+2. Confirm `dotnet test Keystone.sln` passes all 222 backend tests.
+3. If modifying frontend apps, confirm `npm test` passes all tests.
+4. Keep `CLAUDE.md`, `ARCHITECTURE.md`, and `docs/testing.md` updated if conventions change.

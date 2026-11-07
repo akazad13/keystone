@@ -3,6 +3,7 @@
 Shared, version-controlled context for anyone working on this repository (people and Claude Code alike). The detailed explanations live in the docs; this file records the current state, the conventions and the traps that are not obvious from the code.
 
 Keep it current: when you finish a feature, change a convention or discover a trap, update this file in the same commit.
+Read CONSTRAINTS.md before writing code. Do not weaken it to make a change pass.
 
 ## What this is
 
@@ -16,6 +17,7 @@ A learning project for understanding a secure .NET + Azure web platform end to e
 | [docs/oidc-guide.md](docs/oidc-guide.md) | Every OIDC flow traced through the code |
 | [docs/azure-deployment.md](docs/azure-deployment.md) | Production preview and `aspire deploy` with Zitadel Cloud |
 | [docs/testing.md](docs/testing.md) | Zero-mock testing paradigm, MTP on .NET 10, and three-tier test architecture |
+| [CONSTRAINTS.md](CONSTRAINTS.md) | Quality floor, enforced thresholds, ratchets, and agent verification gates |
 | [docs/build-along.md](docs/build-along.md) | The feature exercises 1 to 7 |
 
 ## Current state (2026-10-14)
