@@ -13,6 +13,7 @@ This directory documents the architectural decision records for Keystone. Each A
 | **[0007](0007-aspire-13-cloud-native-orchestration-and-deployment.md)** | Cloud-native orchestration and deployment with .NET Aspire 13 (D6) | Accepted | 2026-10-17 | .NET Aspire, Azure Bicep |
 | **[0008](0008-step-up-authentication-for-destructive-operations.md)** | Step-up authentication for destructive operations | Accepted | 2026-10-17 | RFC 9470, Step-Up Auth |
 | **[0009](0009-back-channel-logout-and-cross-session-revocation.md)** | Back-channel logout and cross-session revocation | Accepted | 2026-10-17 | OIDC Back-Channel Logout |
+| **[0010](0010-package-modernization.md)** | Solution package modernization and dependency alignment | Accepted | 2026-11-07 | Dependency Modernization |
 
 ---
 
