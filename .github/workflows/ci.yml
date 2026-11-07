@@ -39,9 +39,7 @@ jobs:
         run: dotnet build Keystone.sln --no-restore --configuration Release
 
       - name: Test
-        run: >
-          dotnet test Keystone.sln --no-build --configuration Release
-          --logger "trx" --logger "console;verbosity=normal" --results-directory TestResults
+        run: dotnet test Keystone.sln --no-build --configuration Release
 
       - name: Upload test results
         if: always()

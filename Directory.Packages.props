@@ -36,6 +36,9 @@
   <ItemGroup Label="Application libraries">
     <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.2.0" />
   </ItemGroup>
+  <ItemGroup Label="Security and cryptography">
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
+  </ItemGroup>
   <!-- Tests. Mocking libraries are not used (Moq is banned): fakes are hand-written in each test project. -->
   <ItemGroup Label="Tests">
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="10.0.14" />
